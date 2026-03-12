@@ -1,6 +1,6 @@
 // lib/core/router/app_router.dart
 import 'package:go_router/go_router.dart';
-
+import '../../features/auth/presentation/auth_selection_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/otp_verification_screen.dart';
@@ -9,6 +9,7 @@ import '../../features/map/presentation/map_screen.dart';
 import '../../features/routes/presentation/routes_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/onboarding/presentation/onboarding_screen.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthProvider authProvider) {
@@ -18,20 +19,30 @@ class AppRouter {
       redirect: (context, state) {
         final isLoggedIn = authProvider.isAuthenticated;
 
-        // Список путей, доступных БЕЗ авторизации
-        final isAuthRoute = state.matchedLocation == '/login' ||
-            state.matchedLocation == '/register' ||
-            state.matchedLocation == '/verify-email';
+        // Разрешенные экраны без авторизации
+        final isAuthRoute = state.matchedLocation == '/onboarding' ||
+            state.matchedLocation == '/auth-selection' || // Будущий экран
+            state.matchedLocation == '/login' ||
+            state.matchedLocation == '/register';
 
-        // Если не авторизован и пытается зайти в закрытую часть -> на логин
-        if (!isLoggedIn && !isAuthRoute) return '/login';
+        // Если не авторизован и лезет на карту -> кидаем на онбординг
+        if (!isLoggedIn && !isAuthRoute) return '/onboarding';
 
-        // Если авторизован и пытается зайти на экраны логина/регистрации -> на карту
+        // Если авторизован и находится на экранах входа -> кидаем на карту
         if (isLoggedIn && isAuthRoute) return '/map';
 
         return null;
       },
       routes: [
+        GoRoute(
+          path: '/onboarding',
+          builder: (context, state) => const OnboardingScreen(),
+        ),
+        // ... (остальные твои роуты: /login, /register, StatefulShellRoute)
+        GoRoute(
+          path: '/auth-selection',
+          builder: (context, state) => const AuthSelectionScreen(),
+        ),
         GoRoute(
           path: '/login',
           builder: (context, state) => LoginScreen(authProvider: authProvider),
