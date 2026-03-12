@@ -10,11 +10,11 @@ class AuthProvider extends ChangeNotifier {
   // Хранилище для токена
   final _storage = const FlutterSecureStorage();
 
-  // Настройка HTTP-клиента
-  // ВАЖНО: 10.0.2.2 используется для Android эмулятора, чтобы достучаться до localhost компьютера.
-  // Для iOS симулятора используй 127.0.0.1. Порт 8080 - стандарт для Spring Boot.
+// Настройка HTTP-клиента
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://10.0.2.2:8080/api/auth', // Базовый путь из контроллера
+    // Для iOS симулятора используем 127.0.0.1
+    // (Если потом запустишь на Android эмуляторе, поменяешь на 10.0.2.2)
+    baseUrl: 'http://127.0.0.1:8080/api/auth',
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
     headers: {'Content-Type': 'application/json'},
