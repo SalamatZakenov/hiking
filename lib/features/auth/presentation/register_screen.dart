@@ -22,11 +22,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _onRegister() {
-    // В будущем здесь будет запрос к API: authService.register(...)
-    // Сейчас просто переходим на экран ввода кода и передаем email
-    final email = _emailController.text.isNotEmpty ? _emailController.text : 'test@example.com';
-    context.push('/verify-email', extra: email);
+  Future<void> _onRegister() async {
+    // Временно убираем переход на экран OTP
+    // context.push('/verify-email', extra: email);
+
+    try {
+      // Достаем провайдер через наш DI-контейнер (locator)
+      final authProvider = locator<AuthProvider>();
+
+      await authProvider.register(
+        _nameController.text,
+        _emailController.text,
+        _passwordController.text,
+      );
+      // Если все прошло без ошибок, authProvider сам вызовет login()
+      // и GoRouter автоматически перекинет нас на главную страницу!
+    } catch (e) {
+      // Здесь можно показать Snackbar с ошибкой
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка при регистрации')),
+      );
+    }
   }
 
   @override
