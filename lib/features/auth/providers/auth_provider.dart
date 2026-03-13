@@ -17,7 +17,7 @@ class AuthProvider extends ChangeNotifier {
   User? _user; // Храним данные вошедшего пользователя
   bool _isLoading = false;
 
-  // Геттеры, которые требовали ошибки:
+  // Геттеры
   User? get user => _user;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null; // Если пользователь не null — он авторизован
@@ -38,7 +38,7 @@ class AuthProvider extends ChangeNotifier {
       });
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Register Error: $e');
+      print('❌ Register Error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -46,11 +46,11 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Метод ВХОДА (Login) — его тоже требовала ошибка
-// Метод ВХОДА (Login)
+  // Метод ВХОДА (Login)
   Future<bool> login(String email, String password) async {
     _isLoading = true;
     notifyListeners();
+
     try {
       final response = await _dio.post('auth/login', data: {
         'email': email,
@@ -58,11 +58,9 @@ class AuthProvider extends ChangeNotifier {
       });
 
       if (response.statusCode == 200) {
-        // 1. Получаем токен (теперь мы знаем, что это просто строка)
+        // 1. Получаем токен
         final String token = response.data.toString();
         print('✅ Успешный логин! Получен токен: $token');
-
-        // ВАЖНО: Тут в будущем мы должны сохранить токен в память телефона!
 
         // 2. Делаем временное имя из email (берем всё, что до @)
         final String tempUsername = email.split('@')[0];
@@ -73,8 +71,17 @@ class AuthProvider extends ChangeNotifier {
         return true;
       }
       return false;
+
+    } on DioException catch (e) {
+      // Ловим специфичную ошибку сервера, чтобы прочитать его ответ
+      print('❌ Ошибка сети при логине: ${e.message}');
+      if (e.response != null) {
+        print('👉 Сервер жалуется на: ${e.response?.data}');
+      }
+      return false;
     } catch (e) {
-      print('❌ Login Error: $e');
+      // Ловим любые другие ошибки
+      print('❌ Какая-то другая ошибка: $e');
       return false;
     } finally {
       _isLoading = false;
