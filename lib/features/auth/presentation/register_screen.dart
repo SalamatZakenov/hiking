@@ -27,22 +27,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _onRegister() async {
+    // 1. Простая валидация перед отправкой
+    if (_nameController.text.isEmpty || _emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Пожалуйста, заполните все поля')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
       final authProvider = locator<AuthProvider>();
 
-      await authProvider.register(
-        _nameController.text,
-        _emailController.text,
-        _passwordController.text,
+      // 2. Вызываем метод регистрации (убедись, что в AuthProvider он возвращает bool)
+      final bool isSuccess = await authProvider.register(
+        username: _nameController.text, // Мейржан ждет именно username
+        email: _emailController.text,
+        password: _passwordController.text,
       );
+
+      if (isSuccess && mounted) {
+        // 3. Если всё ок — показываем успех и уходим на экран логина
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Регистрация прошла успешно!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.push('/login'); // Или context.pop(), чтобы просто вернуться назад
+      } else if (mounted) {
+        // Если сервер ответил ошибкой (например, email уже занят)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ошибка регистрации. Возможно, email уже занят.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
 
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ошибка при регистрации. Проверьте данные.'),
+          SnackBar(
+            content: Text('Ошибка сети: $e'),
             backgroundColor: Colors.redAccent,
           ),
         );

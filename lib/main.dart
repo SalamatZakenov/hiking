@@ -1,21 +1,20 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Не забудь импорт!
+import 'package:provider/provider.dart';
+import 'package:dio/dio.dart'; // ВАЖНО: не забудь этот импорт!
 
-// Относительные импорты
+// Относительные импорты твоего проекта
 import 'core/di/locator.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'core/theme/app_theme.dart';
 
-void main() {
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Инициализируем зависимости (GetIt)
   setupLocator();
 
   runApp(
-    // Оборачиваем всё приложение, используя экземпляр из локатора
     ChangeNotifierProvider.value(
       value: locator<AuthProvider>(),
       child: const HikingApp(),
@@ -28,7 +27,6 @@ class HikingApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Теперь мы можем достать провайдер через контекст
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final router = AppRouter.createRouter(authProvider);
 
