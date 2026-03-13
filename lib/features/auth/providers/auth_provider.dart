@@ -47,6 +47,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Метод ВХОДА (Login) — его тоже требовала ошибка
+// Метод ВХОДА (Login)
   Future<bool> login(String email, String password) async {
     _isLoading = true;
     notifyListeners();
@@ -57,14 +58,23 @@ class AuthProvider extends ChangeNotifier {
       });
 
       if (response.statusCode == 200) {
-        // Допустим, сервер возвращает данные пользователя
-        // Пока создадим "заглушку", чтобы приложение заработало
-        _user = User(username: 'User', email: email);
+        // 1. Получаем токен (теперь мы знаем, что это просто строка)
+        final String token = response.data.toString();
+        print('✅ Успешный логин! Получен токен: $token');
+
+        // ВАЖНО: Тут в будущем мы должны сохранить токен в память телефона!
+
+        // 2. Делаем временное имя из email (берем всё, что до @)
+        final String tempUsername = email.split('@')[0];
+
+        // 3. Авторизуем пользователя
+        _user = User(username: tempUsername, email: email);
+
         return true;
       }
       return false;
     } catch (e) {
-      print('Login Error: $e');
+      print('❌ Login Error: $e');
       return false;
     } finally {
       _isLoading = false;
