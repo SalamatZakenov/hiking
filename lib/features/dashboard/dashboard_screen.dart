@@ -1,29 +1,72 @@
 // lib/features/dashboard/dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/theme/app_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
-
   const DashboardScreen({super.key, required this.navigationShell});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) {
-          navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
-          );
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.map_outlined), label: 'Map'),
-          NavigationDestination(icon: Icon(Icons.route_outlined), label: 'Routes'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
+      backgroundColor: AppTheme.bgDark,
+      body: Stack(
+        children: [
+          // Основной контент (экраны)
+          navigationShell,
+
+          // Кастомная навигация
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: 34,
+            child: Container(
+              height: 72, // Фиксированная высота
+              decoration: BoxDecoration(
+                color: AppTheme.cardDark.withOpacity(0.98),
+                borderRadius: BorderRadius.circular(36),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(0, Icons.home_filled),
+                  _buildNavItem(1, Icons.explore_rounded),
+                  _buildNavItem(2, Icons.favorite_rounded),
+                  _buildNavItem(3, Icons.person_rounded),
+                ],
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  // Виджет одной кнопки навигации
+  Widget _buildNavItem(int index, IconData icon) {
+    final isSelected = navigationShell.currentIndex == index;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => navigationShell.goBranch(index),
+      child: SizedBox(
+        width: 60,
+        height: 72, // На всю высоту контейнера для легкого нажатия
+        child: Center(
+          child: Icon(
+            icon,
+            size: 28,
+            color: isSelected ? AppTheme.accentYellow : AppTheme.textGrey.withOpacity(0.4),
+          ),
+        ),
       ),
     );
   }
