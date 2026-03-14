@@ -10,11 +10,12 @@ import '../../features/routes/presentation/routes_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
+import '../../features/routes/presentation/route_details_screen.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthProvider authProvider) {
     return GoRouter(
-      initialLocation: '/map',
+      initialLocation: '/routes',
       refreshListenable: authProvider,
       redirect: (context, state) {
         final isLoggedIn = authProvider.isAuthenticated;
@@ -24,7 +25,7 @@ class AppRouter {
             state.matchedLocation == '/register';
 
         if (!isLoggedIn && !isAuthRoute) return '/onboarding';
-        if (isLoggedIn && isAuthRoute) return '/map';
+        if (isLoggedIn && isAuthRoute) return '/routes';
         return null;
       },
       routes: [
@@ -36,8 +37,25 @@ class AppRouter {
         StatefulShellRoute.indexedStack(
           builder: (context, state, navigationShell) => DashboardScreen(navigationShell: navigationShell),
           branches: [
-            // 1. Home (пока используем Map или заглушку)
-            StatefulShellBranch(routes: [GoRoute(path: '/routes', builder: (context, state) => const RoutesScreen())]),
+            // Ветка Explore/Map
+            StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                      path: '/routes',
+                      builder: (context, state) => const RoutesScreen(),
+                      routes: [
+                        // Вложенный роут: /routes/123
+                        GoRoute(
+                          path: ':id',
+                          builder: (context, state) {
+                            final routeId = state.pathParameters['id']!;
+                            return RouteDetailsScreen(routeId: routeId); // Не забудь импортировать RouteDetailsScreen вверху!
+                          },
+                        ),
+                      ]
+                  )
+                ]
+            ),
 
             // 2. Map (реальная карта)
             StatefulShellBranch(routes: [GoRoute(path: '/map', builder: (context, state) => const MapScreen())]),

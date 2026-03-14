@@ -18,8 +18,16 @@ class ProfileScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         title: const Text('Profile', style: TextStyle(color: AppTheme.textGrey)),
         actions: [
-          IconButton(icon: const Icon(Icons.settings_outlined, color: AppTheme.accentYellow), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.more_horiz, color: AppTheme.accentYellow), onPressed: () {}),
+          // Кнопка Настроек
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: AppTheme.accentYellow),
+            onPressed: () => _showSettingsPanel(context, authProvider),
+          ),
+          // Кнопка Трех точек
+          IconButton(
+            icon: const Icon(Icons.more_horiz, color: AppTheme.accentYellow),
+            onPressed: () => _showMoreOptionsPanel(context),
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -110,6 +118,111 @@ class ProfileScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
       ],
+    );
+  }
+
+  // --- ВСПЛЫВАЮЩИЕ ШТОРКИ (BOTTOM SHEETS) ---
+
+  // 1. Шторка Настроек (Settings)
+  void _showSettingsPanel(BuildContext context, AuthProvider authProvider) {
+    showModalBottomSheet(
+        context: context,
+        useRootNavigator: true,
+        backgroundColor: AppTheme.cardDark,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                // Маленькая полоска сверху для красоты (Drag Handle)
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 24),
+                const Text('Settings', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+
+                // Заглушки для будущих настроек
+                ListTile(
+                  leading: const Icon(Icons.support_agent, color: AppTheme.textGrey),
+                  title: const Text('Support', style: TextStyle(color: Colors.white)),
+                  onTap: () {}, // Будущая навигация
+                ),
+                ListTile(
+                  leading: const Icon(Icons.lock_outline, color: AppTheme.textGrey),
+                  title: const Text('Privacy & Security', style: TextStyle(color: Colors.white)),
+                  onTap: () {}, // Будущая навигация
+                ),
+
+                const Divider(color: Colors.white10, height: 32),
+
+                // Кнопка Выхода
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.redAccent),
+                  title: const Text('Log Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                  onTap: () {
+                    Navigator.pop(context); // Сначала закрываем шторку
+                    authProvider.logout(); // Вызываем выход (Роутер сам перекинет на Онбординг)
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        }
+    );
+  }
+
+  // 2. Шторка Трех точек (More Options)
+  void _showMoreOptionsPanel(BuildContext context) {
+    showModalBottomSheet(
+        context: context,
+        useRootNavigator: true,
+        backgroundColor: AppTheme.cardDark,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 24),
+
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined, color: Colors.white),
+                  title: const Text('Edit Profile', style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: Переход на экран редактирования
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.share_outlined, color: Colors.white),
+                  title: const Text('Share Profile', style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: Вызов системного share-меню
+                  },
+                ),
+
+                const Divider(color: Colors.white10, height: 32),
+
+                // Кнопка Отмены
+                ListTile(
+                  leading: const Icon(Icons.close, color: AppTheme.textGrey),
+                  title: const Text('Cancel', style: TextStyle(color: AppTheme.textGrey)),
+                  onTap: () => Navigator.pop(context),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        }
     );
   }
 }
