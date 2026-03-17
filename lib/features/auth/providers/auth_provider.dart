@@ -10,7 +10,7 @@ class User {
 
 class AuthProvider extends ChangeNotifier {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://ec2-51-20-123-149.eu-north-1.compute.amazonaws.com:8080/api/',
+    baseUrl: 'http://ec2-13-49-175-155.eu-north-1.compute.amazonaws.com',
     connectTimeout: const Duration(seconds: 10),
   ));
 
@@ -24,18 +24,21 @@ class AuthProvider extends ChangeNotifier {
 
   // Метод РЕГИСТРАЦИИ
   Future<bool> register({
-    required String username,
+    required String username, // 1. ИСПРАВИЛИ name НА username
     required String email,
-    required String password,
+    required String password
   }) async {
     _isLoading = true;
     notifyListeners();
+
     try {
-      final response = await _dio.post('auth/register', data: {
-        'username': username,
-        'email': email,
-        'password': password,
-      });
+      final response = await _dio.post(
+          '/api/auth/register',
+          data: {
+            'username': username,
+            'email': email,
+            'password': password,
+          });
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       print('❌ Register Error: $e');
@@ -52,12 +55,15 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _dio.post('auth/login', data: {
-        'email': email,
-        'password': password,
-      });
+// Добавили / перед api
+      final response = await _dio.post(
+          '/api/auth/login',
+          data: {
+            'email': email,
+            'password': password,
+          });
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         // 1. Получаем токен
         final String token = response.data.toString();
         print('✅ Успешный логин! Получен токен: $token');
@@ -73,14 +79,12 @@ class AuthProvider extends ChangeNotifier {
       return false;
 
     } on DioException catch (e) {
-      // Ловим специфичную ошибку сервера, чтобы прочитать его ответ
       print('❌ Ошибка сети при логине: ${e.message}');
       if (e.response != null) {
         print('👉 Сервер жалуется на: ${e.response?.data}');
       }
       return false;
     } catch (e) {
-      // Ловим любые другие ошибки
       print('❌ Какая-то другая ошибка: $e');
       return false;
     } finally {

@@ -42,7 +42,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       // 2. Вызываем метод регистрации (убедись, что в AuthProvider он возвращает bool)
       final bool isSuccess = await authProvider.register(
-        username: _nameController.text, // Мейржан ждет именно username
+        username: _nameController.text,
         email: _emailController.text,
         password: _passwordController.text,
       );
