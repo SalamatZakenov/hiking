@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:dio/dio.dart'; // ВАЖНО: не забудь этот импорт!
+import 'package:dio/dio.dart';
 
 // Относительные импорты твоего проекта
 import 'core/di/locator.dart';

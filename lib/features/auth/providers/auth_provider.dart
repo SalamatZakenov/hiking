@@ -10,7 +10,7 @@ class User {
 
 class AuthProvider extends ChangeNotifier {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://ec2-13-49-175-155.eu-north-1.compute.amazonaws.com',
+    baseUrl: 'https://shyn-api.site',
     connectTimeout: const Duration(seconds: 10),
   ));
 

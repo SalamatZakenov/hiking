@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
+import '../../features/map/presentation/map_screen.dart';
 import '../../features/auth/presentation/auth_selection_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
@@ -58,7 +59,13 @@ class AppRouter {
             ),
 
             // 2. Map (реальная карта)
-            StatefulShellBranch(routes: [GoRoute(path: '/map', builder: (context, state) => const MapScreen())]),
+            StatefulShellBranch(routes: [
+              GoRoute(
+                  path: '/map',
+                  builder: (context, state) => const MapScreen()
+              )
+            ]
+            ),
 
             // 3. Like (пустая заглушка)
             StatefulShellBranch(routes: [
