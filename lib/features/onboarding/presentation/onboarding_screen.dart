@@ -9,10 +9,10 @@ class OnboardingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgDark, // Гарантируем темный фон везде
+      backgroundColor: AppTheme.bgDark,
       body: Stack(
         children: [
-          // 1. Плавный градиент на весь экран
+          // 1. Плавный градиент на фоне (как на макете)
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -20,11 +20,12 @@ class OnboardingScreen extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Color(0xFFE5E5E5), // Светлый верх как в макете
-                    AppTheme.bgDark,   // Плавный переход в темный
+                    Color(0xFFDCE2E8), // Светло-серый/белый верх
+                    Color(0xFF8394A3), // Переходный стальной
+                    AppTheme.bgDark,   // Темный низ
                     AppTheme.bgDark,
                   ],
-                  stops: [0.0, 0.4, 1.0], // Градиент заканчивается на 40% экрана
+                  stops: [0.0, 0.35, 0.6, 1.0],
                 ),
               ),
             ),
@@ -36,33 +37,38 @@ class OnboardingScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 children: [
-                  const SizedBox(height: 80),
+                  const SizedBox(height: 60), // Отступ сверху
 
-                  // Карточка с логотипом
+                  // Карточка с контентом и логотипом
                   Expanded(
                     child: Stack(
                       clipBehavior: Clip.none,
                       alignment: Alignment.topCenter,
                       children: [
-                        // Сама темная карточка
+                        // Сама стальная карточка
                         Container(
-                          margin: const EdgeInsets.only(top: 50),
-                          padding: const EdgeInsets.fromLTRB(24, 64, 24, 32),
+                          margin: const EdgeInsets.only(top: 50, bottom: 20),
+                          padding: const EdgeInsets.fromLTRB(24, 70, 24, 32),
                           decoration: BoxDecoration(
-                            color: AppTheme.cardDark,
+                            color: AppTheme.cardSlate,
                             borderRadius: BorderRadius.circular(32),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // Заголовок
+                              // Заголовок Track Every Step
                               RichText(
                                 textAlign: TextAlign.center,
                                 text: const TextSpan(
-                                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'San Francisco'),
                                   children: [
                                     TextSpan(text: 'Track Every '),
-                                    TextSpan(text: 'Step', style: TextStyle(color: AppTheme.accentYellow)),
+                                    TextSpan(
+                                      text: 'Step',
+                                      style: TextStyle(
+                                        decorationColor: AppTheme.iconDark,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -72,28 +78,17 @@ class OnboardingScreen extends StatelessWidget {
                               const Text(
                                 'Stay on course with real-time GPS\ntracking and offline maps.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: AppTheme.textGrey, fontSize: 14, height: 1.5),
+                                style: TextStyle(color: AppTheme.textLightGrey, fontSize: 15, height: 1.5),
                               ),
+
                               const SizedBox(height: 40),
 
-                              // Таймлайн
-                              _buildTimelineItem(Icons.location_on, 'START POINT', 'Your Base Camp • 1,200m', isFirst: true),
-                              _buildTimelineItem(Icons.directions_walk, 'LIVE TRACKING', 'Current Pace • 3.2 km/h', isHighlight: true),
-                              _buildTimelineItem(Icons.flag, 'SUMMIT GOAL', "Eagle's Peak • 3,450m", isLast: true),
+                              // Таймлайн (Темные иконки на светлом фоне)
+                              _buildTimelineItem(Icons.location_on_rounded, 'START POINT', 'Your Base Camp • 1,200m', isFirst: true),
+                              _buildTimelineItem(Icons.directions_walk_rounded, 'LIVE TRACKING', 'Current Pace • 3.2 km/h', isHighlight: true),
+                              _buildTimelineItem(Icons.flag_rounded, 'SUMMIT GOAL', "Eagle's Peak • 3,450m", isLast: true),
 
                               const Spacer(),
-
-                              // Индикаторы страниц (Dots)
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  _buildDot(false),
-                                  const SizedBox(width: 6),
-                                  _buildDot(true), // Активный
-                                  const SizedBox(width: 6),
-                                  _buildDot(false),
-                                ],
-                              ),
                             ],
                           ),
                         ),
@@ -105,13 +100,19 @@ class OnboardingScreen extends StatelessWidget {
                             width: 100,
                             height: 100,
                             decoration: BoxDecoration(
-                              color: AppTheme.cardDark,
+                              color: AppTheme.iconDark, // Темный фон круга
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppTheme.accentYellow, width: 4),
+                              border: Border.all(color: AppTheme.cardSlate.withOpacity(0.5), width: 6), // Внешняя полупрозрачная рамка
                             ),
-                            // Иконка гор (ближе к макету)
-                            child: const Center(
-                              child: Icon(Icons.terrain_rounded, size: 50, color: AppTheme.accentYellow),
+                            child: Container(
+                              margin: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: AppTheme.cardSlate, width: 2), // Внутренняя тонкая рамка
+                                shape: BoxShape.circle,
+                              ),
+                              // Если у тебя есть вырезанный логотип, используй Image.asset,
+                              // пока ставлю иконку гор для визуального соответствия
+                              child: const Icon(Icons.terrain_rounded, size: 40, color: Colors.white),
                             ),
                           ),
                         ),
@@ -119,24 +120,12 @@ class OnboardingScreen extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 32),
-
-                  // Нижняя кнопка (Принудительно красим в нужный цвет)
+                  // Нижняя кнопка (использует стиль из новой темы)
                   FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.accentYellow, // Горчичный цвет
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 56),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                    ),
-                    onPressed: () {
-                      context.push('/auth-selection');
-                    },
-                    child: const Text('Lets Try and Get Started', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    onPressed: () => context.push('/auth-selection'),
+                    child: const Text('Lets Try and Get Started'),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -146,38 +135,28 @@ class OnboardingScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDot(bool isActive) {
-    return Container(
-      height: 6,
-      width: isActive ? 32 : 6,
-      decoration: BoxDecoration(
-        color: isActive ? AppTheme.accentYellow : Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(3),
-      ),
-    );
-  }
-
+  // Обновленный таймлайн под новый дизайн
   Widget _buildTimelineItem(IconData icon, String title, String subtitle, {bool isFirst = false, bool isLast = false, bool isHighlight = false}) {
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Левая часть: Иконка и линии
+          // Левая часть: Темный кружок и тонкая линия
           Column(
             children: [
               Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  color: isHighlight ? AppTheme.accentYellow : Colors.white.withValues(alpha: 0.1),
+                width: 40, height: 40,
+                decoration: const BoxDecoration(
+                  color: AppTheme.iconDark, // Темно-синий кружок
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 18, color: isHighlight ? Colors.white : AppTheme.accentYellow),
+                child: Icon(icon, size: 20, color: isHighlight ? Colors.white : AppTheme.cardSlate),
               ),
               if (!isLast)
                 Expanded(
                   child: Container(
                     width: 1.5,
-                    color: isHighlight ? AppTheme.accentYellow : Colors.white.withValues(alpha: 0.1),
+                    color: AppTheme.iconDark.withOpacity(0.3), // Темная полупрозрачная линия
                   ),
                 ),
             ],
@@ -186,13 +165,13 @@ class OnboardingScreen extends StatelessWidget {
           // Правая часть: Текст
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 28.0, top: 2),
+              padding: const EdgeInsets.only(bottom: 32.0, top: 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontSize: 14, color: isHighlight ? AppTheme.accentYellow : Colors.white, fontWeight: FontWeight.bold)),
+                  Text(title, style: const TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: const TextStyle(color: AppTheme.textGrey, fontSize: 13)),
+                  Text(subtitle, style: const TextStyle(color: AppTheme.textLightGrey, fontSize: 14, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),

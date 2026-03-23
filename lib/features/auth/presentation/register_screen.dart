@@ -27,7 +27,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _onRegister() async {
-    // 1. Простая валидация перед отправкой
     if (_nameController.text.isEmpty || _emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Пожалуйста, заполните все поля')),
@@ -40,7 +39,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final authProvider = locator<AuthProvider>();
 
-      // 2. Вызываем метод регистрации (убедись, что в AuthProvider он возвращает bool)
       final bool isSuccess = await authProvider.register(
         username: _nameController.text,
         email: _emailController.text,
@@ -48,16 +46,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       if (isSuccess && mounted) {
-        // 3. Если всё ок — показываем успех и уходим на экран логина
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Регистрация прошла успешно!'),
             backgroundColor: Colors.green,
           ),
         );
-        context.push('/login'); // Или context.pop(), чтобы просто вернуться назад
+        context.push('/login');
       } else if (mounted) {
-        // Если сервер ответил ошибкой (например, email уже занят)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Ошибка регистрации. Возможно, email уже занят.'),
@@ -85,7 +81,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgDark, // Темный фон из нашей темы
+      backgroundColor: AppTheme.bgDark, // Новый глубокий фон
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -96,35 +92,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Иконка вместо скучного заголовка
-              const Center(
-                child: Icon(Icons.person_add_alt_1_rounded, size: 60, color: AppTheme.accentYellow),
+              // Премиальная иконка в стиле нового дизайна
+              Center(
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppTheme.iconDark,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.cardSlate.withOpacity(0.5), width: 4),
+                  ),
+                  child: Container(
+                    margin: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppTheme.cardSlate, width: 2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.person_add_rounded, size: 36, color: Colors.white),
+                  ),
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               const Text(
                 'Create Account',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.5),
               ),
               const SizedBox(height: 8),
 
               const Text(
                 'Sign up to track your first trail',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 16),
+                style: TextStyle(color: AppTheme.textLightGrey, fontSize: 16),
               ),
               const SizedBox(height: 40),
 
-              // Поля ввода с кастомным стилем
+              // Поля ввода с новым "стальным" стилем
               TextField(
                 controller: _nameController,
                 style: const TextStyle(color: Colors.white),
-                decoration: _customInputDecoration('Username', Icons.person_outline),
+                decoration: _customInputDecoration('Username', Icons.person_outline_rounded),
               ),
               const SizedBox(height: 16),
 
@@ -140,18 +152,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _passwordController,
                 style: const TextStyle(color: Colors.white),
                 obscureText: true,
-                decoration: _customInputDecoration('Password', Icons.lock_outline),
+                decoration: _customInputDecoration('Password', Icons.lock_outline_rounded),
               ),
               const SizedBox(height: 40),
 
-              // Кнопка в стиле дизайна
+              // Кнопка регистрации
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.accentYellow,
+                  backgroundColor: AppTheme.cardSlate, // Стальной цвет
                   foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 56),
+                  minimumSize: const Size(double.infinity, 60),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(30),
                   ),
                 ),
                 onPressed: _isLoading ? null : _onRegister,
@@ -160,18 +173,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : const Text('Sign Up', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               // Текст для перехода на логин
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Already have an account? ', style: TextStyle(color: AppTheme.textGrey)),
+                  const Text('Already have an account? ', style: TextStyle(color: AppTheme.textLightGrey)),
                   GestureDetector(
                     onTap: () => context.push('/login'),
                     child: const Text(
                       'Log In',
-                      style: TextStyle(color: AppTheme.accentYellow, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -183,23 +196,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Helper-метод для красивых текстовых полей
+  // Обновленный helper-метод для красивых текстовых полей
   InputDecoration _customInputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: AppTheme.textGrey),
-      prefixIcon: Icon(icon, color: AppTheme.textGrey),
+      labelStyle: const TextStyle(color: AppTheme.textLightGrey),
+      prefixIcon: Icon(icon, color: AppTheme.textLightGrey),
       filled: true,
-      fillColor: AppTheme.cardDark, // Цвет заливки инпута
+      fillColor: AppTheme.iconDark, // Новый темно-синий цвет заливки инпута
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none, // Убираем стандартную рамку
+        borderRadius: BorderRadius.circular(20), // Более скругленные углы
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppTheme.accentYellow, width: 2), // Золотая рамка при фокусе
+        borderRadius: BorderRadius.circular(20),
+        borderSide: const BorderSide(color: AppTheme.cardSlate, width: 2), // Стальная рамка при фокусе
       ),
-      floatingLabelStyle: const TextStyle(color: AppTheme.accentYellow), // Цвет текста при поднятии
+      floatingLabelStyle: const TextStyle(color: AppTheme.textLightGrey),
     );
   }
 }

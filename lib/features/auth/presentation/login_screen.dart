@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgDark, // Фирменный темный фон
+      backgroundColor: AppTheme.bgDark, // Фирменный глубокий фон
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -64,27 +64,43 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Иконка
-              const Center(
-                child: Icon(Icons.landscape_rounded, size: 60, color: AppTheme.accentYellow),
+              // Премиальная иконка (как на экране регистрации)
+              Center(
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppTheme.iconDark,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.cardSlate.withOpacity(0.5), width: 4),
+                  ),
+                  child: Container(
+                    margin: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppTheme.cardSlate, width: 2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.landscape_rounded, size: 36, color: Colors.white),
+                  ),
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               const Text(
                 'Welcome Back',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.5),
               ),
               const SizedBox(height: 8),
 
               const Text(
                 'Log in to continue exploring',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 16),
+                style: TextStyle(color: AppTheme.textLightGrey, fontSize: 16),
               ),
               const SizedBox(height: 48),
 
@@ -102,18 +118,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _passwordController,
                 style: const TextStyle(color: Colors.white),
                 obscureText: true,
-                decoration: _customInputDecoration('Password', Icons.lock_outline),
+                decoration: _customInputDecoration('Password', Icons.lock_outline_rounded),
               ),
               const SizedBox(height: 40),
 
-              // Кнопка логина
+              // Кнопка логина (стальной стиль)
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.accentYellow,
+                  backgroundColor: AppTheme.cardSlate,
                   foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 56),
+                  minimumSize: const Size(double.infinity, 60),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(30),
                   ),
                 ),
                 onPressed: _isLoading ? null : _handleLogin,
@@ -125,18 +142,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     : const Text('Log In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
               // Переход на регистрацию
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("Don't have an account? ", style: TextStyle(color: AppTheme.textGrey)),
+                  const Text("Don't have an account? ", style: TextStyle(color: AppTheme.textLightGrey)),
                   GestureDetector(
                     onTap: () => context.push('/register'),
                     child: const Text(
                       'Sign Up',
-                      style: TextStyle(color: AppTheme.accentYellow, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -148,23 +165,23 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Тот же самый красивый стиль для полей ввода
+  // Обновленный стиль для полей ввода (один в один как в RegisterScreen)
   InputDecoration _customInputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: AppTheme.textGrey),
-      prefixIcon: Icon(icon, color: AppTheme.textGrey),
+      labelStyle: const TextStyle(color: AppTheme.textLightGrey),
+      prefixIcon: Icon(icon, color: AppTheme.textLightGrey),
       filled: true,
-      fillColor: AppTheme.cardDark,
+      fillColor: AppTheme.iconDark, // Темно-синяя заливка
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppTheme.accentYellow, width: 2),
+        borderRadius: BorderRadius.circular(20),
+        borderSide: const BorderSide(color: AppTheme.cardSlate, width: 2), // Стальная рамка
       ),
-      floatingLabelStyle: const TextStyle(color: AppTheme.accentYellow),
+      floatingLabelStyle: const TextStyle(color: AppTheme.textLightGrey),
     );
   }
 }

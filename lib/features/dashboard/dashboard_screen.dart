@@ -1,4 +1,5 @@
 // lib/features/dashboard/dashboard_screen.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
@@ -9,44 +10,46 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ПРОФЕССИОНАЛЬНЫЙ ТРЮК:
-    // Проверяем, открыта ли сейчас вкладка Карты (у нее индекс 1 в твоем app_router)
-    final isMapScreen = navigationShell.currentIndex == 1;
+    // Временно скрываем меню на карте (если карта это индекс 2)
+    final isMapScreen = navigationShell.currentIndex == 2;
 
     return Scaffold(
       backgroundColor: AppTheme.bgDark,
+      // Просто обычный Stack, он сам наложит панель поверх списков
       body: Stack(
         children: [
-          // Основной контент (экраны)
           navigationShell,
 
-          // Показываем нижнее меню ТОЛЬКО если мы НЕ на экране карты
           if (!isMapScreen)
             Positioned(
               left: 24,
               right: 24,
               bottom: 34,
-              child: Container(
-                height: 72, // Фиксированная высота
-                decoration: BoxDecoration(
-                  color: AppTheme.cardDark.withOpacity(0.98),
-                  borderRadius: BorderRadius.circular(36),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(36),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                  child: Container(
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppTheme.iconDark.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(36),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.08),
+                        width: 1.0,
+                      ),
                     ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildNavItem(0, Icons.home_filled),
-                    _buildNavItem(1, Icons.explore_rounded), // Иконка карты
-                    _buildNavItem(2, Icons.favorite_rounded),
-                    _buildNavItem(3, Icons.person_rounded),
-                  ],
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildNavItem(0, Icons.home_filled),
+                        _buildNavItem(1, Icons.people_alt_rounded),
+                        _buildNavItem(2, Icons.map_rounded),
+                        _buildNavItem(3, Icons.favorite_rounded),
+                        _buildNavItem(4, Icons.person_rounded),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -55,28 +58,25 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // Виджет одной кнопки навигации
   Widget _buildNavItem(int index, IconData icon) {
     final isSelected = navigationShell.currentIndex == index;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
-        // ВОТ СЮДА МЫ ВСТАВИЛИ ПРАВИЛЬНЫЙ КОД ПЕРЕХОДА
         navigationShell.goBranch(
           index,
-          // initialLocation: true заставляет вкладку сбрасываться к начальному состоянию, если на нее нажали повторно
           initialLocation: index == navigationShell.currentIndex,
         );
       },
       child: SizedBox(
-        width: 60,
-        height: 72, // На всю высоту контейнера для легкого нажатия
+        width: 50,
+        height: 72,
         child: Center(
           child: Icon(
             icon,
-            size: 28,
-            color: isSelected ? AppTheme.accentYellow : AppTheme.textGrey.withOpacity(0.4),
+            size: 26,
+            color: isSelected ? Colors.white : AppTheme.cardSlate.withOpacity(0.7),
           ),
         ),
       ),

@@ -17,17 +17,22 @@ class AuthSelectionScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 60),
 
-              // Логотип
+              // Логотип (в стиле нового дизайна Onboarding)
               Container(
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: AppTheme.cardDark,
+                  color: AppTheme.iconDark,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppTheme.accentYellow, width: 3),
+                  border: Border.all(color: AppTheme.cardSlate.withOpacity(0.5), width: 4),
                 ),
-                child: const Center(
-                  child: Icon(Icons.terrain_rounded, size: 40, color: AppTheme.accentYellow),
+                child: Container(
+                  margin: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppTheme.cardSlate, width: 2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.terrain_rounded, size: 36, color: Colors.white),
                 ),
               ),
               const SizedBox(height: 32),
@@ -38,71 +43,74 @@ class AuthSelectionScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: Colors.white,
+                  letterSpacing: 0.5,
                 ),
               ),
               const SizedBox(height: 48),
 
               // Кнопки соцсетей
               _buildSocialButton(
-                icon: Icons.apple,
+                iconWidget: const Icon(Icons.apple, size: 28, color: Colors.white),
                 label: 'Continue with Apple',
                 onPressed: () {},
               ),
               const SizedBox(height: 16),
 
               _buildSocialButton(
-                icon: Icons.email,
+                // Имитация иконки Google
+                iconWidget: _buildGooglePlaceholder(),
                 label: 'Continue with Google',
                 onPressed: () {},
               ),
               const SizedBox(height: 16),
 
               _buildSocialButton(
-                icon: Icons.facebook,
+                iconWidget: const Icon(Icons.facebook, size: 28, color: Color(0xFF1877F2)), // Фирменный синий цвет Facebook
                 label: 'Continue with Facebook',
                 onPressed: () {},
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
 
               // Разделитель "OR"
               Row(
                 children: [
                   Expanded(
-                    child: Divider(color: Colors.white.withValues(alpha: 0.1), thickness: 1),
+                    child: Divider(color: AppTheme.cardSlate.withOpacity(0.5), thickness: 1),
                   ),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.0),
                     child: Text(
                       'OR',
-                      style: TextStyle(color: AppTheme.textGrey, fontWeight: FontWeight.bold, fontSize: 14),
+                      style: TextStyle(color: AppTheme.textLightGrey, fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                   ),
                   Expanded(
-                    child: Divider(color: Colors.white.withValues(alpha: 0.1), thickness: 1),
+                    child: Divider(color: AppTheme.cardSlate.withOpacity(0.5), thickness: 1),
                   ),
                 ],
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
 
-              // Кнопка "Continue with email" (Белая)
+              // Кнопка "Continue with email" (В новом стальном стиле)
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size(double.infinity, 56),
+                  backgroundColor: AppTheme.cardSlate,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 60),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(30), // Овальная форма
                   ),
+                  elevation: 0,
                 ),
                 onPressed: () {
-                  // Переход на экран регистрации
+                  // Переход на экран логина
                   context.push('/login');
                 },
                 child: const Text(
                   'Continue with email',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -112,30 +120,29 @@ class AuthSelectionScreen extends StatelessWidget {
     );
   }
 
-  // Кастомный виджет для соц. кнопки
+  // Кастомный виджет для кнопок соцсетей
   Widget _buildSocialButton({
-    required IconData icon,
+    required Widget iconWidget,
     required String label,
     required VoidCallback onPressed,
-    double iconSize = 24,
   }) {
     return SizedBox(
-      height: 56,
+      height: 60,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.accentYellow,
+          backgroundColor: AppTheme.cardSlate, // Тот самый стальной цвет
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(30),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
         ),
         onPressed: onPressed,
         child: Row(
           children: [
             // Иконка слева
-            Icon(icon, size: iconSize, color: Colors.white),
+            SizedBox(width: 30, child: iconWidget),
 
             // Текст строго по центру
             Expanded(
@@ -147,9 +154,33 @@ class AuthSelectionScreen extends StatelessWidget {
               ),
             ),
 
-            // Невидимая заглушка справа для баланса, чтобы текст был идеально по центру
-            SizedBox(width: iconSize),
+            // Невидимая заглушка справа для идеального баланса текста по центру
+            const SizedBox(width: 30),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Временная заглушка для иконки Google
+  // (Потом можно будет скачать картинку google.png и использовать Image.asset)
+  Widget _buildGooglePlaceholder() {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
+      child: const Center(
+        child: Text(
+          'G',
+          style: TextStyle(
+            color: Colors.redAccent,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'San Francisco', // Или любой другой базовый шрифт
+          ),
         ),
       ),
     );
