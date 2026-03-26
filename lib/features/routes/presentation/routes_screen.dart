@@ -12,9 +12,9 @@ class RoutesScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Column( // Главная колонка всего экрана
+        child: Column(
           children: [
-            // --- 1. СТАТИЧНАЯ ШАПКА (Не двигается при скролле) ---
+            // --- 1. СТАТИЧНАЯ ШАПКА ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
               child: Stack(
@@ -44,7 +44,7 @@ class RoutesScreen extends StatelessWidget {
               ),
             ),
 
-            // --- 2. СКРОЛЛИРУЕМАЯ ЧАСТЬ (Всё остальное уезжает вверх) ---
+            // --- 2. СКРОЛЛИРУЕМАЯ ЧАСТЬ ---
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -107,12 +107,21 @@ class RoutesScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
 
-                    // Карточки
-                    const RouteCardMock(badge: 'HARD', location: 'AOSTA VALLEY, ITALY', title: 'Gran Paradiso Loop', isLoaded: true),
-                    const RouteCardMock(badge: 'EASY', location: 'AOSTA VALLEY, ITALY', title: 'Gran Paradiso Loop', isLoaded: true),
-                    const RouteCardMock(badge: 'MIDDLE', location: 'AOSTA VALLEY, ITALY', title: 'Gran Paradiso Loop', isLoaded: false),
+                    // --- КАРТОЧКИ ПИКОВ АЛМАТЫ ---
+                    GestureDetector(
+                      onTap: () => context.go('/routes/kok_tobe'), // Передаем ID
+                      child: const RouteCardMock(badge: 'EASY', location: 'ALMATY, KAZAKHSTAN', title: 'Kok Tobe', isLoaded: true),
+                    ),
+                    GestureDetector(
+                      onTap: () => context.go('/routes/shymbulak'),
+                      child: const RouteCardMock(badge: 'MIDDLE', location: 'ALMATY, KAZAKHSTAN', title: 'Shymbulak', isLoaded: true),
+                    ),
+                    GestureDetector(
+                      onTap: () => context.go('/routes/bap'),
+                      child: const RouteCardMock(badge: 'HARD', location: 'ALMATY, KAZAKHSTAN', title: 'Big Almaty Peak', isLoaded: false),
+                    ),
 
-                    // Отступ внизу, чтобы последняя карточка не пряталась за стеклянным меню
+                    // Отступ внизу
                     const SizedBox(height: 100),
                   ],
                 ),
@@ -125,7 +134,7 @@ class RoutesScreen extends StatelessWidget {
   }
 }
 
-// Обновленный класс карточки (остался без изменений, как ты и просил)
+// Класс карточки
 class RouteCardMock extends StatelessWidget {
   final String badge;
   final String location;
@@ -146,11 +155,20 @@ class RouteCardMock extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 24),
       height: 280,
       decoration: BoxDecoration(
-        color: AppTheme.iconDark,
+        color: const Color(0xFF2C2C2E), // Цвет фона как в детальном экране
         borderRadius: BorderRadius.circular(24),
       ),
       child: Stack(
         children: [
+          // --- ЗАГЛУШКА: Иконка горы на фоне ---
+          const Center(
+            child: Icon(
+              Icons.terrain_rounded,
+              size: 80,
+              color: Colors.white24, // Полупрозрачная белая иконка
+            ),
+          ),
+
           // Стеклянная панель внизу
           Positioned(
             bottom: 0,
@@ -168,7 +186,6 @@ class RouteCardMock extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      // Текст (Локация и Название)
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,8 +206,6 @@ class RouteCardMock extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-
-                      // Иконки
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -204,7 +219,6 @@ class RouteCardMock extends StatelessWidget {
                               child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                             ),
                           const SizedBox(width: 8),
-
                           _buildPdfDifficultyBadge(badge),
                         ],
                       ),

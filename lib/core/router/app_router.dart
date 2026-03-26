@@ -76,12 +76,15 @@ class AppRouter {
             ),
 
             // 2. Ветка MAPS (Реальная карта)
-            // В DashboardScreen мы прописали скрытие панели именно для индекса 2!
             StatefulShellBranch(
                 routes: [
                   GoRoute(
                       path: '/map',
-                      builder: (context, state) => const MapScreen()
+                      builder: (context, state) {
+                        // Достаем переданное название пика (если есть)
+                        final targetPeakName = state.extra as String?;
+                        return MapScreen(targetPeakName: targetPeakName);
+                      }
                   )
                 ]
             ),
