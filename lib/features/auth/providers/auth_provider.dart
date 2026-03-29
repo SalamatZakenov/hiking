@@ -1,5 +1,7 @@
+// lib/features/auth/providers/auth_provider.dart
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:jwt_decoder/jwt_decoder.dart'; // <-- Пакет для расшифровки токена
 
 // Простая модель пользователя
 class User {
@@ -24,7 +26,7 @@ class AuthProvider extends ChangeNotifier {
 
   // Метод РЕГИСТРАЦИИ
   Future<bool> register({
-    required String username, // 1. ИСПРАВИЛИ name НА username
+    required String username,
     required String email,
     required String password
   }) async {
@@ -49,13 +51,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Метод ВХОДА (Login)
+  // Метод ВХОДА (Login по паролю)
   Future<bool> login(String email, String password) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-// Добавили / перед api
       final response = await _dio.post(
           '/api/auth/login',
           data: {
@@ -64,14 +65,10 @@ class AuthProvider extends ChangeNotifier {
           });
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // 1. Получаем токен
         final String token = response.data.toString();
         print('✅ Успешный логин! Получен токен: $token');
 
-        // 2. Делаем временное имя из email (берем всё, что до @)
         final String tempUsername = email.split('@')[0];
-
-        // 3. Авторизуем пользователя
         _user = User(username: tempUsername, email: email);
 
         return true;
@@ -93,8 +90,36 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // --- НОВЫЙ МЕТОД: Вход через Google / Facebook ---
+  Future<void> loginWithOAuthToken(String token) async {
+    print('✅ Успешный вход через OAuth! Токен: $token');
+
+    try {
+      // 1. Расшифровываем токен
+      Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
+      print('👉 Данные внутри токена: $decodedToken');
+
+      // 2. Вытаскиваем email
+      String realEmail = decodedToken['sub'] ?? 'google@user.com';
+
+      // 3. Вытаскиваем имя (пока берем кусок почты до собачки @)
+      String realName = decodedToken['name'] ?? realEmail.split('@')[0];
+
+      // 4. Сохраняем реальные данные!
+      _user = User(username: realName, email: realEmail);
+
+    } catch (e) {
+      print('❌ Ошибка расшифровки токена: $e');
+      _user = User(username: "Explorer", email: "error@token.com");
+    }
+
+    notifyListeners();
+  }
+
+  // --- ТОТ САМЫЙ МЕТОД ВЫХОДА (LOGOUT) ---
   void logout() {
     _user = null;
     notifyListeners();
   }
+
 }

@@ -31,7 +31,7 @@ class AppRouter {
       routes: [
         // --- ЭКРАНЫ БЕЗ НИЖНЕЙ ПАНЕЛИ НАВИГАЦИИ ---
         GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
-        GoRoute(path: '/auth-selection', builder: (context, state) => const AuthSelectionScreen()),
+        GoRoute(path: '/auth-selection', builder: (context, state) => AuthSelectionScreen(authProvider: authProvider)),
         GoRoute(path: '/login', builder: (context, state) => LoginScreen(authProvider: authProvider)),
         GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
 
