@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart' hide Path;
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 
 enum TrackingState { idle, active, paused }
 
@@ -344,66 +345,69 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          _buildMap(),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildGlassButton(icon: Icons.keyboard_arrow_down_rounded, onTap: () => context.go('/routes')),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildGlassPanel(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.layers_rounded, color: Colors.white), onPressed: () {}),
-                            Container(height: 1, width: 24, color: Colors.white24),
-                            IconButton(icon: const Icon(Icons.view_in_ar_rounded, color: Colors.white), onPressed: () {}),
-                          ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            _buildMap(),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildGlassButton(icon: Icons.keyboard_arrow_down_rounded, onTap: () => context.go('/routes')),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildGlassPanel(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(icon: const Icon(Icons.layers_rounded, color: Colors.white), onPressed: () {}),
+                              Container(height: 1, width: 24, color: Colors.white24),
+                              IconButton(icon: const Icon(Icons.view_in_ar_rounded, color: Colors.white), onPressed: () {}),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildGlassPanel(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.add, color: Colors.white), onPressed: _zoomIn),
-                            Container(height: 1, width: 24, color: Colors.white24),
-                            IconButton(icon: const Icon(Icons.remove, color: Colors.white), onPressed: _zoomOut),
-                          ],
+                        const SizedBox(height: 16),
+                        _buildGlassPanel(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(icon: const Icon(Icons.add, color: Colors.white), onPressed: _zoomIn),
+                              Container(height: 1, width: 24, color: Colors.white24),
+                              IconButton(icon: const Icon(Icons.remove, color: Colors.white), onPressed: _zoomOut),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildGlassButton(icon: Icons.my_location_rounded, onTap: _moveToCurrentLocation),
-                    ],
-                  ),
-                ],
+                        const SizedBox(height: 16),
+                        _buildGlassButton(icon: Icons.my_location_rounded, onTap: _moveToCurrentLocation),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          Positioned(
-            left: 0, right: 0, bottom: 0,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, animation) => SlideTransition(
-                position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(animation),
-                child: child,
+            Positioned(
+              left: 0, right: 0, bottom: 0,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) => SlideTransition(
+                  position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(animation),
+                  child: child,
+                ),
+                child: _selectedPeak != null
+                    ? _buildMiniPeakInfo(key: const ValueKey('peak_info'))
+                    : _buildRoutePanel(key: const ValueKey('route_panel')),
               ),
-              child: _selectedPeak != null
-                  ? _buildMiniPeakInfo(key: const ValueKey('peak_info'))
-                  : _buildRoutePanel(key: const ValueKey('route_panel')),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
-
-// Относительные импорты твоего проекта
 import 'core/di/locator.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'core/theme/app_theme.dart';
-
+import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   setupLocator();
+
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+    ),
+  );
 
   runApp(
     ChangeNotifierProvider.value(

@@ -3,131 +3,135 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import 'package:flutter/services.dart';
 
 class RoutesScreen extends StatelessWidget {
   const RoutesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // --- 1. СТАТИЧНАЯ ШАПКА ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  const Text(
-                    'SHYN',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2.5,
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      icon: const Icon(Icons.notifications_none_rounded, color: Colors.black, size: 28),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Уведомлений пока нет')),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // --- 2. СКРОЛЛИРУЕМАЯ ЧАСТЬ ---
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // --- 1. СТАТИЧНАЯ ШАПКА ---
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    const SizedBox(height: 16),
-
-                    // Заголовки
                     const Text(
-                        'MORNING, EXPLORER',
-                        style: TextStyle(color: AppTheme.cardSlate, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.2)
+                      'SHYN',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.5,
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Discover the\ngreat outdoors.',
-                      style: TextStyle(color: Colors.black, fontSize: 32, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: 0.5),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.notifications_none_rounded, color: Colors.black, size: 28),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Уведомлений пока нет')),
+                          );
+                        },
+                      ),
                     ),
-                    const SizedBox(height: 32),
-
-                    // Строка поиска и фильтр
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 56,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3F4F6),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.search_rounded, color: Colors.black54, size: 28),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                      'Search parks, peaks...',
-                                      style: TextStyle(color: Colors.black54.withOpacity(0.5), fontSize: 16)
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          height: 56,
-                          width: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.black,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.tune_rounded, color: Colors.white),
-                            onPressed: () {},
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // --- КАРТОЧКИ ПИКОВ АЛМАТЫ ---
-                    GestureDetector(
-                      onTap: () => context.go('/routes/kok_tobe'), // Передаем ID
-                      child: const RouteCardMock(badge: 'EASY', location: 'ALMATY, KAZAKHSTAN', title: 'Kok Tobe', isLoaded: true),
-                    ),
-                    GestureDetector(
-                      onTap: () => context.go('/routes/shymbulak'),
-                      child: const RouteCardMock(badge: 'MIDDLE', location: 'ALMATY, KAZAKHSTAN', title: 'Shymbulak', isLoaded: true),
-                    ),
-                    GestureDetector(
-                      onTap: () => context.go('/routes/bap'),
-                      child: const RouteCardMock(badge: 'HARD', location: 'ALMATY, KAZAKHSTAN', title: 'Big Almaty Peak', isLoaded: false),
-                    ),
-
-                    // Отступ внизу
-                    const SizedBox(height: 100),
                   ],
                 ),
               ),
-            ),
-          ],
+
+              // --- 2. СКРОЛЛИРУЕМАЯ ЧАСТЬ ---
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+
+                      // Заголовки
+                      const Text(
+                          'MORNING, EXPLORER',
+                          style: TextStyle(color: AppTheme.cardSlate, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.2)
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Discover the\ngreat outdoors.',
+                        style: TextStyle(color: Colors.black, fontSize: 32, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Строка поиска и фильтр
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 56,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.search_rounded, color: Colors.black54, size: 28),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                        'Search parks, peaks...',
+                                        style: TextStyle(color: Colors.black54.withOpacity(0.5), fontSize: 16)
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            height: 56,
+                            width: 56,
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.tune_rounded, color: Colors.white),
+                              onPressed: () {},
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // --- КАРТОЧКИ ПИКОВ АЛМАТЫ ---
+                      GestureDetector(
+                        onTap: () => context.go('/routes/kok_tobe'), // Передаем ID
+                        child: const RouteCardMock(badge: 'EASY', location: 'ALMATY, KAZAKHSTAN', title: 'Kok Tobe', isLoaded: true),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.go('/routes/shymbulak'),
+                        child: const RouteCardMock(badge: 'MIDDLE', location: 'ALMATY, KAZAKHSTAN', title: 'Shymbulak', isLoaded: true),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.go('/routes/bap'),
+                        child: const RouteCardMock(badge: 'HARD', location: 'ALMATY, KAZAKHSTAN', title: 'Big Almaty Peak', isLoaded: false),
+                      ),
+
+                      // Отступ внизу
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
