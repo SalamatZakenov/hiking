@@ -1,83 +1,95 @@
 // lib/features/dashboard/dashboard_screen.dart
-import 'dart:ui';
+import 'dart:ui'; // <--- Обязательно добавляем для эффекта размытия (стекла)
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/theme/app_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
+
   const DashboardScreen({super.key, required this.navigationShell});
+
+  void _onTap(BuildContext context, int index) {
+    if (index == 2) {
+      context.push('/map');
+    } else {
+      navigationShell.goBranch(
+        index,
+        initialLocation: index == navigationShell.currentIndex,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Временно скрываем меню на карте (если карта это индекс 2)
-    final isMapScreen = navigationShell.currentIndex == 2;
-
     return Scaffold(
-      backgroundColor: AppTheme.bgDark,
-      // Просто обычный Stack, он сам наложит панель поверх списков
-      body: Stack(
-        children: [
-          navigationShell,
+      extendBody: true, // <--- Контент скроллится ПОД панелью
+      backgroundColor: Colors.transparent,
+      body: navigationShell,
 
-          if (!isMapScreen)
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: 34,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(36),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-                  child: Container(
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: AppTheme.iconDark.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(36),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.08),
-                        width: 1.0,
+      // Вместо SafeArea используем Padding, чтобы панель "висела" над контентом
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          // Добавляем отступ снизу под системную полоску iPhone + еще 8 пикселей
+          bottom: MediaQuery.of(context).padding.bottom + 8,
+          top: 8,
+        ),
+        child: ClipRRect( // <--- Обрезаем эффект стекла по краям
+          borderRadius: BorderRadius.circular(32),
+          child: BackdropFilter( // <--- ЭФФЕКТ МАТОВОГО СТЕКЛА
+            filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.35), // <--- Панель теперь полупрозрачная!
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(color: Colors.white.withOpacity(0.1)), // Легкая светлая рамка
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(context, Icons.home_filled, 0),
+                  _buildNavItem(context, Icons.people_alt_outlined, 1),
+
+                  // --- ЦЕНТРАЛЬНАЯ КНОПКА КАРТЫ ---
+                  GestureDetector(
+                    onTap: () => _onTap(context, 2),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))
+                          ]
                       ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildNavItem(0, Icons.home_filled),
-                        _buildNavItem(1, Icons.people_alt_rounded),
-                        _buildNavItem(2, Icons.map_rounded),
-                        _buildNavItem(3, Icons.favorite_rounded),
-                        _buildNavItem(4, Icons.person_rounded),
-                      ],
+                      child: const Icon(Icons.map_rounded, color: Colors.black, size: 28),
                     ),
                   ),
-                ),
+
+                  _buildNavItem(context, Icons.favorite_border_rounded, 3),
+                  _buildNavItem(context, Icons.person_outline_rounded, 4),
+                ],
               ),
             ),
-        ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon) {
+  Widget _buildNavItem(BuildContext context, IconData icon, int index) {
     final isSelected = navigationShell.currentIndex == index;
-
     return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        navigationShell.goBranch(
-          index,
-          initialLocation: index == navigationShell.currentIndex,
-        );
-      },
-      child: SizedBox(
-        width: 50,
-        height: 72,
-        child: Center(
-          child: Icon(
-            icon,
-            size: 26,
-            color: isSelected ? Colors.white : AppTheme.cardSlate.withOpacity(0.7),
-          ),
+      onTap: () => _onTap(context, index),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        color: Colors.transparent,
+        child: Icon(
+          icon,
+          color: isSelected ? Colors.white : Colors.white54,
+          size: 26,
         ),
       ),
     );

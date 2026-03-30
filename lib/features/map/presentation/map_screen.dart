@@ -10,6 +10,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 
 enum TrackingState { idle, active, paused }
+enum MapStyle { light, satellite }
 
 class Peak {
   final String id;
@@ -33,14 +34,16 @@ class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   final Dio _dio = Dio();
 
-  final Color _routeGreen = const Color(0xFF32D74B); // iOS Green
-  final Color _userBlue = const Color(0xFF007AFF); // iOS Blue
+  final Color _routeGreen = const Color(0xFF32D74B);
+  final Color _userBlue = const Color(0xFF007AFF);
   final Color _glassColor = Colors.black.withOpacity(0.4);
   final Color _glassBorder = Colors.white.withOpacity(0.15);
 
   LatLng? _currentLocation;
   bool _isLoadingLocation = true;
   bool _isPanelExpanded = false;
+
+  MapStyle _currentMapStyle = MapStyle.light;
 
   String _selectedActivity = 'Hiking';
   final List<String> _activities = ['Hiking', 'Walking', 'Running', 'Cycling'];
@@ -61,7 +64,6 @@ class _MapScreenState extends State<MapScreen> {
   List<LatLng> _pathToPeak = [];
   bool _isLoadingPath = false;
 
-  // --- НАВИГАЦИЯ ---
   bool _isNavigatingRoute = false;
   List<dynamic> _routeSteps = [];
   int _currentStepIndex = 0;
@@ -93,6 +95,65 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  String get _mapUrlTemplate {
+    if (_currentMapStyle == MapStyle.satellite) {
+      return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    }
+    return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  }
+
+  // --- НОВОЕ: Всплывающая шторка выбора карты ---
+  void _showMapStyleSelector(BuildContext context) {
+    showModalBottomSheet(
+        context: context,
+        backgroundColor: const Color(0xFF1E1E1E), // Темный фон как в Профиле
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 24),
+                const Text('Map Type', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+
+                // Кнопка Светлой карты
+                ListTile(
+                  leading: const Icon(Icons.map_outlined, color: Colors.white),
+                  title: const Text('Default Map', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  trailing: _currentMapStyle == MapStyle.light
+                      ? Icon(Icons.check_circle, color: _userBlue)
+                      : null,
+                  onTap: () {
+                    setState(() => _currentMapStyle = MapStyle.light);
+                    Navigator.pop(context); // Закрываем шторку
+                  },
+                ),
+
+                // Кнопка Спутника
+                ListTile(
+                  leading: const Icon(Icons.satellite_alt_outlined, color: Colors.white),
+                  title: const Text('Satellite', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  trailing: _currentMapStyle == MapStyle.satellite
+                      ? Icon(Icons.check_circle, color: _userBlue)
+                      : null,
+                  onTap: () {
+                    setState(() => _currentMapStyle = MapStyle.satellite);
+                    Navigator.pop(context);
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        }
+    );
+  }
+
   void _processTargetPeak(String uniqueTarget) {
     final realName = uniqueTarget.split('||')[0];
     try {
@@ -113,63 +174,40 @@ class _MapScreenState extends State<MapScreen> {
     _mapController.move(peak.location, 14.0);
   }
 
-  // Запрашиваем маршрут с ИНСТРУКЦИЯМИ ПОВОРОТОВ (steps=true)
   Future<void> _fetchPathToPeak(Peak peak) async {
     if (_currentLocation == null) return;
-
-    setState(() {
-      _isLoadingPath = true;
-      _pathToPeak.clear();
-      _routeSteps.clear();
-    });
-
+    setState(() { _isLoadingPath = true; _pathToPeak.clear(); _routeSteps.clear(); });
     try {
       final url = 'http://router.project-osrm.org/route/v1/foot/${_currentLocation!.longitude},${_currentLocation!.latitude};${peak.location.longitude},${peak.location.latitude}?overview=full&geometries=geojson&steps=true';
-
       final response = await _dio.get(url);
       if (response.statusCode == 200) {
         final coords = response.data['routes'][0]['geometry']['coordinates'] as List;
-        final steps = response.data['routes'][0]['legs'][0]['steps'] as List; // Шаги навигации
-
+        final steps = response.data['routes'][0]['legs'][0]['steps'] as List;
         setState(() {
           _pathToPeak = coords.map((c) => LatLng(c[1], c[0])).toList();
           _routeSteps = steps;
           _currentStepIndex = 0;
           _isLoadingPath = false;
         });
-
         _mapController.fitCamera(
-          CameraFit.bounds(
-            bounds: LatLngBounds.fromPoints([_currentLocation!, peak.location]),
-            padding: const EdgeInsets.all(50.0),
-          ),
+          CameraFit.bounds(bounds: LatLngBounds.fromPoints([_currentLocation!, peak.location]), padding: const EdgeInsets.all(50.0)),
         );
       }
     } catch (e) {
-      setState(() {
-        _pathToPeak = [_currentLocation!, peak.location];
-        _isLoadingPath = false;
-      });
+      setState(() { _pathToPeak = [_currentLocation!, peak.location]; _isLoadingPath = false; });
     }
   }
 
-  // --- СТАРТ НАВИГАЦИИ ---
   void _startNavigation() {
-    setState(() {
-      _isNavigatingRoute = true;
-      _selectedPeak = null; // Скрываем карточку пика, показываем панель трекинга
-    });
-    _mapController.move(_currentLocation!, 17.0); // Приближаем карту
-    _startTracking(); // Запускаем сам таймер и трекинг
+    setState(() { _isNavigatingRoute = true; _selectedPeak = null; });
+    _mapController.move(_currentLocation!, 17.0);
+    _startTracking();
   }
 
   void _clearSelectedPeak() {
     setState(() {
       _selectedPeak = null;
-      if (!_isNavigatingRoute) {
-        _pathToPeak.clear();
-        _routeSteps.clear();
-      }
+      if (!_isNavigatingRoute) { _pathToPeak.clear(); _routeSteps.clear(); }
     });
   }
 
@@ -216,12 +254,11 @@ class _MapScreenState extends State<MapScreen> {
     return Icons.cloud_rounded;
   }
 
-  // --- ТРЕКИНГ И ПРОВЕРКА ШАГОВ НАВИГАЦИИ ---
   void _startTracking() {
     setState(() {
       _trackingState = TrackingState.active;
       _isPanelExpanded = false;
-      if (!_isNavigatingRoute) _secondsElapsed = 0; // Сбрасываем только если это новый свободный трекинг
+      if (!_isNavigatingRoute) _secondsElapsed = 0;
       if (!_isNavigatingRoute) _distanceMeters = 0.0;
       if (!_isNavigatingRoute) _routePoints.clear();
       if (_currentLocation != null && _routePoints.isEmpty) _routePoints.add(_currentLocation!);
@@ -237,23 +274,15 @@ class _MapScreenState extends State<MapScreen> {
       if (_trackingState == TrackingState.active) {
         setState(() {
           final newPoint = LatLng(position.latitude, position.longitude);
-          if (_routePoints.isNotEmpty) {
-            _distanceMeters += const Distance().distance(_routePoints.last, newPoint);
-          }
+          if (_routePoints.isNotEmpty) _distanceMeters += const Distance().distance(_routePoints.last, newPoint);
           _routePoints.add(newPoint);
           _currentLocation = newPoint;
           _mapController.move(newPoint, _mapController.camera.zoom);
 
-          // Проверяем, не дошли ли мы до следующего поворота?
           if (_isNavigatingRoute && _routeSteps.isNotEmpty && _currentStepIndex < _routeSteps.length) {
             final stepLoc = _routeSteps[_currentStepIndex]['maneuver']['location'];
             final stepLatLng = LatLng(stepLoc[1], stepLoc[0]);
-            final distanceToTurn = const Distance().distance(newPoint, stepLatLng);
-
-            // Если до поворота меньше 15 метров, переключаем на следующую инструкцию
-            if (distanceToTurn < 15) {
-              _currentStepIndex++;
-            }
+            if (const Distance().distance(newPoint, stepLatLng) < 15) _currentStepIndex++;
           }
         });
       }
@@ -267,13 +296,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _resumeTracking() {
-    setState(() {
-      _trackingState = TrackingState.active;
-      _isPanelExpanded = false;
-    });
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() => _secondsElapsed++);
-    });
+    setState(() { _trackingState = TrackingState.active; _isPanelExpanded = false; });
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => setState(() => _secondsElapsed++));
     _positionStream?.resume();
   }
 
@@ -282,21 +306,16 @@ class _MapScreenState extends State<MapScreen> {
     setState(() {
       _trackingState = TrackingState.idle;
       _isPanelExpanded = true;
-      _isNavigatingRoute = false; // Выключаем режим навигации
-      _pathToPeak.clear();
-      _routeSteps.clear();
-      _routePoints.clear();
-      _secondsElapsed = 0;
-      _distanceMeters = 0;
+      _isNavigatingRoute = false;
+      _pathToPeak.clear(); _routeSteps.clear(); _routePoints.clear();
+      _secondsElapsed = 0; _distanceMeters = 0;
     });
     _positionStream?.cancel();
   }
 
   void _zoomIn() => _mapController.move(_mapController.camera.center, _mapController.camera.zoom + 1.0);
   void _zoomOut() => _mapController.move(_mapController.camera.center, _mapController.camera.zoom - 1.0);
-  void _moveToCurrentLocation() {
-    if (_currentLocation != null) _mapController.move(_currentLocation!, 16.0);
-  }
+  void _moveToCurrentLocation() { if (_currentLocation != null) _mapController.move(_currentLocation!, 16.0); }
 
   String get _formattedTime {
     final h = _secondsElapsed ~/ 3600;
@@ -306,7 +325,6 @@ class _MapScreenState extends State<MapScreen> {
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
-  // --- ГЕНЕРАТОР ТЕКСТА И ИКОНКИ ДЛЯ ПОВОРОТОВ ---
   String get _currentInstruction {
     if (!_isNavigatingRoute || _routeSteps.isEmpty || _currentStepIndex >= _routeSteps.length) return 'Follow the route to destination';
     final step = _routeSteps[_currentStepIndex];
@@ -322,8 +340,6 @@ class _MapScreenState extends State<MapScreen> {
     String text = action;
     if (name.isNotEmpty) text += ' on $name';
     if (distance > 0) text += ' in ${distance}m';
-
-    // Делаем текст красивым
     return text.replaceAll('left', 'left').replaceAll('right', 'right').capitalize();
   }
 
@@ -346,7 +362,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark,
+      value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
@@ -363,14 +379,11 @@ class _MapScreenState extends State<MapScreen> {
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // --- ИЗМЕНЕНИЕ: Теперь тут только одна кнопка слоев ---
                         _buildGlassPanel(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(icon: const Icon(Icons.layers_rounded, color: Colors.white), onPressed: () {}),
-                              Container(height: 1, width: 24, color: Colors.white24),
-                              IconButton(icon: const Icon(Icons.view_in_ar_rounded, color: Colors.white), onPressed: () {}),
-                            ],
+                          child: IconButton(
+                            icon: const Icon(Icons.layers_rounded, color: Colors.white),
+                            onPressed: () => _showMapStyleSelector(context),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -392,7 +405,6 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
             ),
-
             Positioned(
               left: 0, right: 0, bottom: 0,
               child: AnimatedSwitcher(
@@ -422,10 +434,7 @@ class _MapScreenState extends State<MapScreen> {
         filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
         child: Container(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.65),
-            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2), width: 1.0)),
-          ),
+          decoration: BoxDecoration(color: Colors.black.withOpacity(0.65), border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2), width: 1.0))),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,39 +469,26 @@ class _MapScreenState extends State<MapScreen> {
                   children: [
                     Expanded(
                       child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.15), foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))
-                        ),
+                        style: FilledButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.15), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
                         icon: const Icon(Icons.info_outline_rounded),
                         label: const Text('Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         onPressed: () => context.push('/routes/${_selectedPeak!.id}'),
                       ),
                     ),
                     const SizedBox(width: 12),
-
-                    // --- МАГИЯ КНОПОК ЗДЕСЬ ---
-                    // Если путь прорисован — показываем зеленую Start Route, иначе белую Draw Path
                     if (_pathToPeak.isNotEmpty)
                       Expanded(
                         child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: _routeGreen, // Зеленая!
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))
-                          ),
+                          style: FilledButton.styleFrom(backgroundColor: _routeGreen, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
                           icon: const Icon(Icons.navigation_rounded),
                           label: const Text('Start Route', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                          onPressed: _startNavigation, // Начинает навигацию!
+                          onPressed: _startNavigation,
                         ),
                       )
                     else
                       Expanded(
                         child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: Colors.white, foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))
-                          ),
+                          style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
                           icon: const Icon(Icons.directions_walk_rounded),
                           label: const Text('Draw Path', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                           onPressed: () => _fetchPathToPeak(_selectedPeak!),
@@ -531,7 +527,7 @@ class _MapScreenState extends State<MapScreen> {
         filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
         child: Container(
           decoration: BoxDecoration(color: _glassColor, border: Border.all(color: _glassBorder), borderRadius: BorderRadius.circular(24)),
-          child: child,
+          child: child, // Теперь сюда четко ложится одиночная кнопка без паддингов
         ),
       ),
     );
@@ -543,9 +539,18 @@ class _MapScreenState extends State<MapScreen> {
 
     return FlutterMap(
       mapController: _mapController,
-      options: MapOptions(initialCenter: initialCenter, initialZoom: 12.0),
+      options: MapOptions(
+        initialCenter: initialCenter,
+        initialZoom: 12.0,
+        maxZoom: 22.0,
+      ),
       children: [
-        TileLayer(urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', userAgentPackageName: 'com.yourname.hikingapp'),
+        TileLayer(
+          urlTemplate: _mapUrlTemplate,
+          userAgentPackageName: 'com.yourname.hikingapp',
+          retinaMode: true,
+          maxNativeZoom: 18,
+        ),
         if (_pathToPeak.isNotEmpty)
           PolylineLayer(polylines: [Polyline(points: _pathToPeak, strokeWidth: 4.0, color: _userBlue, borderStrokeWidth: 1.0, borderColor: Colors.white)]),
         if (_routePoints.isNotEmpty)
@@ -555,9 +560,7 @@ class _MapScreenState extends State<MapScreen> {
             if (_currentLocation != null)
               Marker(
                 point: _currentLocation!, width: 30, height: 30,
-                child: Container(
-                  decoration: BoxDecoration(color: _userBlue, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2))]),
-                ),
+                child: Container(decoration: BoxDecoration(color: _userBlue, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2))])),
               ),
             ..._peaks.map((peak) {
               bool isSelected = _selectedPeak == peak;
@@ -595,13 +598,11 @@ class _MapScreenState extends State<MapScreen> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
+            duration: const Duration(milliseconds: 300), curve: Curves.easeInOut,
             decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2), width: 1.0))),
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Center(
                   child: GestureDetector(
@@ -609,30 +610,18 @@ class _MapScreenState extends State<MapScreen> {
                     child: Container(width: 40, height: 5, margin: const EdgeInsets.only(bottom: 20, top: 4), decoration: BoxDecoration(color: Colors.white.withOpacity(0.4), borderRadius: BorderRadius.circular(3))),
                   ),
                 ),
-
-                // --- БАННЕР НАВИГАЦИИ ПОЯВЛЯЕТСЯ ТУТ ---
                 if (_isNavigatingRoute)
                   Container(
-                    margin: const EdgeInsets.only(bottom: 24),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _userBlue.withOpacity(0.2), // Синий фон навигации
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _userBlue.withOpacity(0.5)),
-                    ),
+                    margin: const EdgeInsets.only(bottom: 24), padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: _userBlue.withOpacity(0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: _userBlue.withOpacity(0.5))),
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: _userBlue, shape: BoxShape.circle),
-                          child: Icon(_currentInstructionIcon, color: Colors.white, size: 28),
-                        ),
+                        Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _userBlue, shape: BoxShape.circle), child: Icon(_currentInstructionIcon, color: Colors.white, size: 28)),
                         const SizedBox(width: 16),
                         Expanded(child: Text(_currentInstruction, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, height: 1.2))),
                       ],
                     ),
                   ),
-
                 AnimatedCrossFade(
                   firstChild: const SizedBox(height: 8),
                   secondChild: Padding(
@@ -650,7 +639,6 @@ class _MapScreenState extends State<MapScreen> {
                   crossFadeState: _isPanelExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
                   duration: const Duration(milliseconds: 300),
                 ),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -659,7 +647,6 @@ class _MapScreenState extends State<MapScreen> {
                     _buildStatItem(value: _elevationGain.toInt().toString(), unit: 'm', label: 'Elev. gain'),
                   ],
                 ),
-
                 const SizedBox(height: 32),
                 _buildActionButtons(),
               ],
@@ -738,6 +725,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 }
+
 extension StringExtension on String {
   String capitalize() {
     if (isEmpty) return this;

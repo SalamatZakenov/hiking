@@ -1,20 +1,27 @@
 // lib/features/routes/presentation/routes_screen.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class RoutesScreen extends StatelessWidget {
   const RoutesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final String userName = (authProvider.user?.username ?? 'EXPLORER').toUpperCase();
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.dark,
+      value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppTheme.bgDark,
+        // --- МАГИЯ ЗДЕСЬ: Отключаем нижнюю границу у SafeArea ---
         body: SafeArea(
+          bottom: false, // <--- Теперь контент будет проваливаться под стеклянную панель!
           child: Column(
             children: [
               // --- 1. СТАТИЧНАЯ ШАПКА ---
@@ -26,7 +33,7 @@ class RoutesScreen extends StatelessWidget {
                     const Text(
                       'SHYN',
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 2.5,
@@ -35,7 +42,7 @@ class RoutesScreen extends StatelessWidget {
                     Align(
                       alignment: Alignment.centerRight,
                       child: IconButton(
-                        icon: const Icon(Icons.notifications_none_rounded, color: Colors.black, size: 28),
+                        icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 28),
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Уведомлений пока нет')),
@@ -50,6 +57,7 @@ class RoutesScreen extends StatelessWidget {
               // --- 2. СКРОЛЛИРУЕМАЯ ЧАСТЬ ---
               Expanded(
                 child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,14 +65,14 @@ class RoutesScreen extends StatelessWidget {
                       const SizedBox(height: 16),
 
                       // Заголовки
-                      const Text(
-                          'MORNING, EXPLORER',
-                          style: TextStyle(color: AppTheme.cardSlate, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.2)
+                      Text(
+                          'MORNING, $userName',
+                          style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.2)
                       ),
                       const SizedBox(height: 8),
                       const Text(
                         'Discover the\ngreat outdoors.',
-                        style: TextStyle(color: Colors.black, fontSize: 32, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: 0.5),
+                        style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: 0.5),
                       ),
                       const SizedBox(height: 32),
 
@@ -76,17 +84,18 @@ class RoutesScreen extends StatelessWidget {
                               height: 56,
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF3F4F6),
+                                color: const Color(0xFF1E1E1E),
                                 borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white10),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.search_rounded, color: Colors.black54, size: 28),
+                                  const Icon(Icons.search_rounded, color: Colors.white54, size: 28),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
                                         'Search parks, peaks...',
-                                        style: TextStyle(color: Colors.black54.withOpacity(0.5), fontSize: 16)
+                                        style: TextStyle(color: Colors.white54.withOpacity(0.5), fontSize: 16)
                                     ),
                                   ),
                                 ],
@@ -98,7 +107,7 @@ class RoutesScreen extends StatelessWidget {
                             height: 56,
                             width: 56,
                             decoration: BoxDecoration(
-                              color: Colors.black,
+                              color: AppTheme.cardSlate,
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: IconButton(
@@ -108,11 +117,11 @@ class RoutesScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
 
                       // --- КАРТОЧКИ ПИКОВ АЛМАТЫ ---
                       GestureDetector(
-                        onTap: () => context.go('/routes/kok_tobe'), // Передаем ID
+                        onTap: () => context.go('/routes/kok_tobe'),
                         child: const RouteCardMock(badge: 'EASY', location: 'ALMATY, KAZAKHSTAN', title: 'Kok Tobe', isLoaded: true),
                       ),
                       GestureDetector(
@@ -124,8 +133,8 @@ class RoutesScreen extends StatelessWidget {
                         child: const RouteCardMock(badge: 'HARD', location: 'ALMATY, KAZAKHSTAN', title: 'Big Almaty Peak', isLoaded: false),
                       ),
 
-                      // Отступ внизу
-                      const SizedBox(height: 100),
+                      // Отступ внизу, чтобы последняя карточка не пряталась под панелью
+                      const SizedBox(height: 120),
                     ],
                   ),
                 ),
@@ -159,25 +168,23 @@ class RouteCardMock extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 24),
       height: 280,
       decoration: BoxDecoration(
-        color: const Color(0xFF2C2C2E), // Цвет фона как в детальном экране
-        borderRadius: BorderRadius.circular(24),
+          color: const Color(0xFF2C2C2E),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))
+          ]
       ),
       child: Stack(
         children: [
-          // --- ЗАГЛУШКА: Иконка горы на фоне ---
           const Center(
             child: Icon(
               Icons.terrain_rounded,
               size: 80,
-              color: Colors.white24, // Полупрозрачная белая иконка
+              color: Colors.white10,
             ),
           ),
-
-          // Стеклянная панель внизу
           Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
+            bottom: 0, left: 0, right: 0,
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24), top: Radius.circular(16)),
               child: BackdropFilter(
@@ -185,7 +192,7 @@ class RouteCardMock extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.35),
+                    color: Colors.black.withOpacity(0.4),
                     border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
                   ),
                   child: Row(
@@ -195,17 +202,9 @@ class RouteCardMock extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                                location,
-                                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8)
-                            ),
+                            Text(location, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
                             const SizedBox(height: 6),
-                            Text(
-                              title,
-                              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                           ],
                         ),
                       ),
@@ -214,14 +213,7 @@ class RouteCardMock extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (isLoaded)
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                            ),
+                            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20)),
                           const SizedBox(width: 8),
                           _buildPdfDifficultyBadge(badge),
                         ],
@@ -240,34 +232,19 @@ class RouteCardMock extends StatelessWidget {
   Widget _buildPdfDifficultyBadge(String difficulty) {
     Color badgeColor;
     switch (difficulty.toUpperCase()) {
-      case 'HARD':
-        badgeColor = const Color(0xFFFF5252);
-        break;
-      case 'EASY':
-        badgeColor = const Color(0xFF4CAF50);
-        break;
-      default:
-        badgeColor = const Color(0xFFFFC107);
+      case 'HARD': badgeColor = const Color(0xFFFF5252); break;
+      case 'EASY': badgeColor = const Color(0xFF4CAF50); break;
+      default: badgeColor = const Color(0xFFFFC107);
     }
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-          color: badgeColor,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: badgeColor.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))
-          ]
-      ),
+      decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: badgeColor.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))]),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.star_rate_rounded, color: Colors.white, size: 16),
           const SizedBox(width: 4),
-          Text(
-            difficulty,
-            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-          ),
+          Text(difficulty, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
         ],
       ),
     );

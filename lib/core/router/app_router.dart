@@ -1,3 +1,4 @@
+// lib/core/router/app_router.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
@@ -13,8 +14,12 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/routes/presentation/route_details_screen.dart';
 
 class AppRouter {
+  // 1. Создаем глобальный ключ для главного навигатора
+  static final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+
   static GoRouter createRouter(AuthProvider authProvider) {
     return GoRouter(
+      navigatorKey: _rootNavigatorKey, // 2. Привязываем ключ к роутеру
       initialLocation: '/routes',
       refreshListenable: authProvider,
       redirect: (context, state) {
@@ -29,25 +34,47 @@ class AppRouter {
         return null;
       },
       routes: [
-        // --- ЭКРАНЫ БЕЗ НИЖНЕЙ ПАНЕЛИ НАВИГАЦИИ ---
+        // --- ЭКРАНЫ БЕЗ НИЖНЕЙ ПАНЕЛИ ---
         GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
         GoRoute(path: '/auth-selection', builder: (context, state) => AuthSelectionScreen(authProvider: authProvider)),
         GoRoute(path: '/login', builder: (context, state) => LoginScreen(authProvider: authProvider)),
         GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
+
+        // --- КАРТА (Теперь это глобальный экран поверх всего с анимацией) ---
+        GoRoute(
+          path: '/map',
+          parentNavigatorKey: _rootNavigatorKey, // Заставляет карту открыться ПОВЕРХ нижней панели!
+          pageBuilder: (context, state) {
+            final targetPeakName = state.extra as String?;
+
+            return CustomTransitionPage(
+              key: state.pageKey,
+              child: MapScreen(targetPeakName: targetPeakName),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                const begin = Offset(0.0, 1.0); // Начать снизу
+                const end = Offset.zero; // Встать в центр
+                const curve = Curves.easeOutCubic; // Очень плавное замедление iOS-стайл
+
+                var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                return SlideTransition(position: animation.drive(tween), child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 350), // Идеальная скорость
+            );
+          },
+        ),
 
         // --- ЭКРАНЫ С НИЖНЕЙ ПАНЕЛЬЮ НАВИГАЦИИ (5 ВЕТОК) ---
         StatefulShellRoute.indexedStack(
           builder: (context, state, navigationShell) => DashboardScreen(navigationShell: navigationShell),
           branches: [
 
-            // 0. Ветка HOME (Routes)
+            // 0. Ветка HOME
             StatefulShellBranch(
                 routes: [
                   GoRoute(
                       path: '/routes',
                       builder: (context, state) => const RoutesScreen(),
                       routes: [
-                        // Вложенный роут: /routes/123 (Детали маршрута)
                         GoRoute(
                           path: ':id',
                           builder: (context, state) {
@@ -60,45 +87,37 @@ class AppRouter {
                 ]
             ),
 
-            // 1. Ветка COMMUNITY (Заглушка)
+            // 1. Ветка COMMUNITY
             StatefulShellBranch(
               routes: [
                 GoRoute(
                   path: '/community',
                   builder: (context, state) => const Scaffold(
                     backgroundColor: AppTheme.bgDark,
-                    body: Center(
-                      child: Text('Community Hub\nComing Soon', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.cardSlate, fontSize: 24, fontWeight: FontWeight.bold)),
-                    ),
+                    body: Center(child: Text('Community Hub\nComing Soon', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.cardSlate, fontSize: 24, fontWeight: FontWeight.bold))),
                   ),
                 ),
               ],
             ),
 
-            // 2. Ветка MAPS (Реальная карта)
+            // 2. Ветка MAPS (Пустая заглушка, чтобы нижняя панель не сломалась)
             StatefulShellBranch(
                 routes: [
                   GoRoute(
-                      path: '/map',
-                      builder: (context, state) {
-                        // Достаем переданное название пика (если есть)
-                        final targetPeakName = state.extra as String?;
-                        return MapScreen(targetPeakName: targetPeakName);
-                      }
+                    path: '/map-tab',
+                    builder: (context, state) => const SizedBox(),
                   )
                 ]
             ),
 
-            // 3. Ветка LIKE (Заглушка)
+            // 3. Ветка LIKED
             StatefulShellBranch(
                 routes: [
                   GoRoute(
                     path: '/liked',
                     builder: (context, state) => const Scaffold(
                       backgroundColor: AppTheme.bgDark,
-                      body: Center(
-                        child: Text('Liked Routes\nComing Soon', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.cardSlate, fontSize: 24, fontWeight: FontWeight.bold)),
-                      ),
+                      body: Center(child: Text('Liked Routes\nComing Soon', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.cardSlate, fontSize: 24, fontWeight: FontWeight.bold))),
                     ),
                   )
                 ]
