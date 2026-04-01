@@ -8,19 +8,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+// Подключаем наши реальные данные
+import '../../routes/providers/route_provider.dart';
+import '../../routes/data/models/route_model.dart';
 
 enum TrackingState { idle, active, paused }
 enum MapStyle { light, satellite }
-
-class Peak {
-  final String id;
-  final String name;
-  final LatLng location;
-  final int elevation;
-  final String difficulty;
-
-  Peak({required this.id, required this.name, required this.location, required this.elevation, required this.difficulty});
-}
 
 class MapScreen extends StatefulWidget {
   final String? targetPeakName;
@@ -60,19 +55,14 @@ class _MapScreenState extends State<MapScreen> {
   double _distanceMeters = 0.0;
   final double _elevationGain = 0.0;
 
-  Peak? _selectedPeak;
+  // --- ИЗМЕНЕНИЕ: Теперь используем реальную модель из БД ---
+  RouteModel? _selectedRoute;
   List<LatLng> _pathToPeak = [];
   bool _isLoadingPath = false;
 
   bool _isNavigatingRoute = false;
   List<dynamic> _routeSteps = [];
   int _currentStepIndex = 0;
-
-  final List<Peak> _peaks = [
-    Peak(id: 'kok_tobe', name: 'Kok Tobe', location: const LatLng(43.2328, 76.9727), elevation: 1100, difficulty: 'EASY'),
-    Peak(id: 'shymbulak', name: 'Shymbulak', location: const LatLng(43.1283, 77.0806), elevation: 2260, difficulty: 'MIDDLE'),
-    Peak(id: 'bap', name: 'Big Almaty Peak', location: const LatLng(43.0601, 76.9333), elevation: 3680, difficulty: 'HARD'),
-  ];
 
   @override
   void initState() {
@@ -81,7 +71,7 @@ class _MapScreenState extends State<MapScreen> {
     if (widget.targetPeakName != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Future.delayed(const Duration(milliseconds: 500), () {
-          _processTargetPeak(widget.targetPeakName!);
+          _processTargetRoute(widget.targetPeakName!);
         });
       });
     }
@@ -91,7 +81,7 @@ class _MapScreenState extends State<MapScreen> {
   void didUpdateWidget(MapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.targetPeakName != null && widget.targetPeakName != oldWidget.targetPeakName) {
-      _processTargetPeak(widget.targetPeakName!);
+      _processTargetRoute(widget.targetPeakName!);
     }
   }
 
@@ -102,14 +92,11 @@ class _MapScreenState extends State<MapScreen> {
     return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   }
 
-  // --- НОВОЕ: Всплывающая шторка выбора карты ---
   void _showMapStyleSelector(BuildContext context) {
     showModalBottomSheet(
         context: context,
-        backgroundColor: const Color(0xFF1E1E1E), // Темный фон как в Профиле
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (context) {
           return SafeArea(
             child: Column(
@@ -121,26 +108,20 @@ class _MapScreenState extends State<MapScreen> {
                 const Text('Map Type', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
 
-                // Кнопка Светлой карты
                 ListTile(
                   leading: const Icon(Icons.map_outlined, color: Colors.white),
                   title: const Text('Default Map', style: TextStyle(color: Colors.white, fontSize: 16)),
-                  trailing: _currentMapStyle == MapStyle.light
-                      ? Icon(Icons.check_circle, color: _userBlue)
-                      : null,
+                  trailing: _currentMapStyle == MapStyle.light ? Icon(Icons.check_circle, color: _userBlue) : null,
                   onTap: () {
                     setState(() => _currentMapStyle = MapStyle.light);
-                    Navigator.pop(context); // Закрываем шторку
+                    Navigator.pop(context);
                   },
                 ),
 
-                // Кнопка Спутника
                 ListTile(
                   leading: const Icon(Icons.satellite_alt_outlined, color: Colors.white),
                   title: const Text('Satellite', style: TextStyle(color: Colors.white, fontSize: 16)),
-                  trailing: _currentMapStyle == MapStyle.satellite
-                      ? Icon(Icons.check_circle, color: _userBlue)
-                      : null,
+                  trailing: _currentMapStyle == MapStyle.satellite ? Icon(Icons.check_circle, color: _userBlue) : null,
                   onTap: () {
                     setState(() => _currentMapStyle = MapStyle.satellite);
                     Navigator.pop(context);
@@ -154,31 +135,35 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  void _processTargetPeak(String uniqueTarget) {
+  void _processTargetRoute(String uniqueTarget) {
     final realName = uniqueTarget.split('||')[0];
     try {
-      final peak = _peaks.firstWhere((p) => p.name == realName);
-      _onPeakTapped(peak);
+      final routeProvider = Provider.of<RouteProvider>(context, listen: false);
+      final route = routeProvider.routes.firstWhere((r) => r.name == realName);
+      _onRouteTapped(route);
     } catch (e) {
       // Игнорируем
     }
   }
 
-  void _onPeakTapped(Peak peak) {
+  void _onRouteTapped(RouteModel route) {
     setState(() {
-      _selectedPeak = peak;
+      _selectedRoute = route;
       _pathToPeak.clear();
       _routeSteps.clear();
       _isLoadingPath = false;
     });
-    _mapController.move(peak.location, 14.0);
+    _mapController.move(LatLng(route.latitude, route.longitude), 14.0);
   }
 
-  Future<void> _fetchPathToPeak(Peak peak) async {
+  Future<void> _fetchPathToRoute(RouteModel route) async {
     if (_currentLocation == null) return;
     setState(() { _isLoadingPath = true; _pathToPeak.clear(); _routeSteps.clear(); });
+
+    final destination = LatLng(route.latitude, route.longitude);
+
     try {
-      final url = 'http://router.project-osrm.org/route/v1/foot/${_currentLocation!.longitude},${_currentLocation!.latitude};${peak.location.longitude},${peak.location.latitude}?overview=full&geometries=geojson&steps=true';
+      final url = 'http://router.project-osrm.org/route/v1/foot/${_currentLocation!.longitude},${_currentLocation!.latitude};${destination.longitude},${destination.latitude}?overview=full&geometries=geojson&steps=true';
       final response = await _dio.get(url);
       if (response.statusCode == 200) {
         final coords = response.data['routes'][0]['geometry']['coordinates'] as List;
@@ -190,23 +175,23 @@ class _MapScreenState extends State<MapScreen> {
           _isLoadingPath = false;
         });
         _mapController.fitCamera(
-          CameraFit.bounds(bounds: LatLngBounds.fromPoints([_currentLocation!, peak.location]), padding: const EdgeInsets.all(50.0)),
+          CameraFit.bounds(bounds: LatLngBounds.fromPoints([_currentLocation!, destination]), padding: const EdgeInsets.all(50.0)),
         );
       }
     } catch (e) {
-      setState(() { _pathToPeak = [_currentLocation!, peak.location]; _isLoadingPath = false; });
+      setState(() { _pathToPeak = [_currentLocation!, destination]; _isLoadingPath = false; });
     }
   }
 
   void _startNavigation() {
-    setState(() { _isNavigatingRoute = true; _selectedPeak = null; });
+    setState(() { _isNavigatingRoute = true; _selectedRoute = null; });
     _mapController.move(_currentLocation!, 17.0);
     _startTracking();
   }
 
-  void _clearSelectedPeak() {
+  void _clearSelectedRoute() {
     setState(() {
-      _selectedPeak = null;
+      _selectedRoute = null;
       if (!_isNavigatingRoute) { _pathToPeak.clear(); _routeSteps.clear(); }
     });
   }
@@ -367,7 +352,7 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            _buildMap(),
+            _buildMap(context),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -379,7 +364,6 @@ class _MapScreenState extends State<MapScreen> {
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // --- ИЗМЕНЕНИЕ: Теперь тут только одна кнопка слоев ---
                         _buildGlassPanel(
                           child: IconButton(
                             icon: const Icon(Icons.layers_rounded, color: Colors.white),
@@ -413,8 +397,8 @@ class _MapScreenState extends State<MapScreen> {
                   position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(animation),
                   child: child,
                 ),
-                child: _selectedPeak != null
-                    ? _buildMiniPeakInfo(key: const ValueKey('peak_info'))
+                child: _selectedRoute != null
+                    ? _buildMiniRouteInfo(key: const ValueKey('peak_info'))
                     : _buildRoutePanel(key: const ValueKey('route_panel')),
               ),
             ),
@@ -424,8 +408,8 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildMiniPeakInfo({required Key key}) {
-    Color difficultyColor = _selectedPeak!.difficulty == 'HARD' ? const Color(0xFFFF453A) : _selectedPeak!.difficulty == 'EASY' ? const Color(0xFF32D74B) : const Color(0xFFFF9F0A);
+  Widget _buildMiniRouteInfo({required Key key}) {
+    Color difficultyColor = _selectedRoute!.difficulty.toUpperCase() == 'HARD' ? const Color(0xFFFF453A) : _selectedRoute!.difficulty.toUpperCase() == 'EASY' ? const Color(0xFF32D74B) : const Color(0xFFFF9F0A);
 
     return ClipRRect(
       key: key,
@@ -442,21 +426,21 @@ class _MapScreenState extends State<MapScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: Text(_selectedPeak!.name, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold))),
-                  IconButton(icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 28), onPressed: _clearSelectedPeak)
+                  Expanded(child: Text(_selectedRoute!.name, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold))),
+                  IconButton(icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 28), onPressed: _clearSelectedRoute)
                 ],
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.height_rounded, color: Colors.white54, size: 18),
+                  const Icon(Icons.route_rounded, color: Colors.white54, size: 18),
                   const SizedBox(width: 4),
-                  Text('${_selectedPeak!.elevation}m', style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text('${_selectedRoute!.distance} km', style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600)),
                   const SizedBox(width: 16),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(color: difficultyColor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
-                    child: Text(_selectedPeak!.difficulty, style: TextStyle(color: difficultyColor, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    child: Text(_selectedRoute!.difficulty.toUpperCase(), style: TextStyle(color: difficultyColor, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                   ),
                 ],
               ),
@@ -472,7 +456,7 @@ class _MapScreenState extends State<MapScreen> {
                         style: FilledButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.15), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
                         icon: const Icon(Icons.info_outline_rounded),
                         label: const Text('Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        onPressed: () => context.push('/routes/${_selectedPeak!.id}'),
+                        onPressed: () => context.push('/routes/${_selectedRoute!.id}'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -491,7 +475,7 @@ class _MapScreenState extends State<MapScreen> {
                           style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
                           icon: const Icon(Icons.directions_walk_rounded),
                           label: const Text('Draw Path', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                          onPressed: () => _fetchPathToPeak(_selectedPeak!),
+                          onPressed: () => _fetchPathToRoute(_selectedRoute!),
                         ),
                       ),
                   ],
@@ -525,17 +509,17 @@ class _MapScreenState extends State<MapScreen> {
       borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-        child: Container(
-          decoration: BoxDecoration(color: _glassColor, border: Border.all(color: _glassBorder), borderRadius: BorderRadius.circular(24)),
-          child: child, // Теперь сюда четко ложится одиночная кнопка без паддингов
-        ),
+        child: Container(decoration: BoxDecoration(color: _glassColor, border: Border.all(color: _glassBorder), borderRadius: BorderRadius.circular(24)), child: child),
       ),
     );
   }
 
-  Widget _buildMap() {
+  Widget _buildMap(BuildContext context) {
     if (_isLoadingLocation) return const Center(child: CircularProgressIndicator(color: Colors.white));
     final initialCenter = _currentLocation ?? const LatLng(43.2300, 76.8520);
+
+    // --- ПОЛУЧАЕМ РЕАЛЬНЫЕ МАРШРУТЫ ИЗ ПРОВАЙДЕРА ---
+    final routes = Provider.of<RouteProvider>(context).routes;
 
     return FlutterMap(
       mapController: _mapController,
@@ -562,12 +546,15 @@ class _MapScreenState extends State<MapScreen> {
                 point: _currentLocation!, width: 30, height: 30,
                 child: Container(decoration: BoxDecoration(color: _userBlue, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2))])),
               ),
-            ..._peaks.map((peak) {
-              bool isSelected = _selectedPeak == peak;
+
+            // --- РИСУЕМ МАРКЕРЫ НА ОСНОВЕ РЕАЛЬНЫХ ДАННЫХ ---
+            ...routes.map((route) {
+              bool isSelected = _selectedRoute?.id == route.id;
               return Marker(
-                point: peak.location, width: 40, height: 40,
+                point: LatLng(route.latitude, route.longitude),
+                width: 40, height: 40,
                 child: GestureDetector(
-                  onTap: () => _onPeakTapped(peak),
+                  onTap: () => _onRouteTapped(route),
                   child: AnimatedScale(
                     scale: isSelected ? 1.2 : 1.0, duration: const Duration(milliseconds: 200),
                     child: Container(

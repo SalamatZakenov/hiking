@@ -14,12 +14,11 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/routes/presentation/route_details_screen.dart';
 
 class AppRouter {
-  // 1. Создаем глобальный ключ для главного навигатора
   static final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
   static GoRouter createRouter(AuthProvider authProvider) {
     return GoRouter(
-      navigatorKey: _rootNavigatorKey, // 2. Привязываем ключ к роутеру
+      navigatorKey: _rootNavigatorKey,
       initialLocation: '/routes',
       refreshListenable: authProvider,
       redirect: (context, state) {
@@ -40,10 +39,20 @@ class AppRouter {
         GoRoute(path: '/login', builder: (context, state) => LoginScreen(authProvider: authProvider)),
         GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
 
-        // --- КАРТА (Теперь это глобальный экран поверх всего с анимацией) ---
+        // --- ДЕТАЛЬНЫЙ ЭКРАН МАРШРУТА ПОВЕРХ ВСЕГО ---
+        GoRoute(
+          path: '/routes/:id', // ВЫНЕСЛИ СЮДА!
+          parentNavigatorKey: _rootNavigatorKey, // Открывается поверх нижней панели
+          builder: (context, state) {
+            final routeId = state.pathParameters['id']!;
+            return RouteDetailsScreen(routeId: routeId);
+          },
+        ),
+
+        // --- КАРТА ---
         GoRoute(
           path: '/map',
-          parentNavigatorKey: _rootNavigatorKey, // Заставляет карту открыться ПОВЕРХ нижней панели!
+          parentNavigatorKey: _rootNavigatorKey,
           pageBuilder: (context, state) {
             final targetPeakName = state.extra as String?;
 
@@ -51,38 +60,28 @@ class AppRouter {
               key: state.pageKey,
               child: MapScreen(targetPeakName: targetPeakName),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                const begin = Offset(0.0, 1.0); // Начать снизу
-                const end = Offset.zero; // Встать в центр
-                const curve = Curves.easeOutCubic; // Очень плавное замедление iOS-стайл
+                const begin = Offset(0.0, 1.0);
+                const end = Offset.zero;
+                const curve = Curves.easeOutCubic;
 
                 var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
                 return SlideTransition(position: animation.drive(tween), child: child);
               },
-              transitionDuration: const Duration(milliseconds: 350), // Идеальная скорость
+              transitionDuration: const Duration(milliseconds: 350),
             );
           },
         ),
 
-        // --- ЭКРАНЫ С НИЖНЕЙ ПАНЕЛЬЮ НАВИГАЦИИ (5 ВЕТОК) ---
+        // --- ЭКРАНЫ С НИЖНЕЙ ПАНЕЛЬЮ НАВИГАЦИИ ---
         StatefulShellRoute.indexedStack(
           builder: (context, state, navigationShell) => DashboardScreen(navigationShell: navigationShell),
           branches: [
-
             // 0. Ветка HOME
             StatefulShellBranch(
                 routes: [
                   GoRoute(
-                      path: '/routes',
-                      builder: (context, state) => const RoutesScreen(),
-                      routes: [
-                        GoRoute(
-                          path: ':id',
-                          builder: (context, state) {
-                            final routeId = state.pathParameters['id']!;
-                            return RouteDetailsScreen(routeId: routeId);
-                          },
-                        ),
-                      ]
+                    path: '/routes',
+                    builder: (context, state) => const RoutesScreen(),
                   )
                 ]
             ),
@@ -100,7 +99,7 @@ class AppRouter {
               ],
             ),
 
-            // 2. Ветка MAPS (Пустая заглушка, чтобы нижняя панель не сломалась)
+            // 2. Ветка MAPS (Пустая заглушка)
             StatefulShellBranch(
                 routes: [
                   GoRoute(
