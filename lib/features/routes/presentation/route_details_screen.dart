@@ -1,226 +1,203 @@
 // lib/features/routes/presentation/route_details_screen.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart' hide Path;
+import 'package:provider/provider.dart';
+import '../providers/route_provider.dart';
+import '../data/models/route_model.dart';
+import '../../../core/theme/app_theme.dart';
 
-class RouteDetailsScreen extends StatefulWidget {
+class RouteDetailsScreen extends StatelessWidget {
   final String routeId;
+
   const RouteDetailsScreen({super.key, required this.routeId});
 
   @override
-  State<RouteDetailsScreen> createState() => _RouteDetailsScreenState();
-}
-
-class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
-  final Dio _dio = Dio();
-  String _weatherText = '...';
-  IconData _weatherIcon = Icons.cloud_outlined;
-
-  late final Map<String, dynamic> peakData;
-
-  @override
-  void initState() {
-    super.initState();
-    _initData();
-  }
-
-  void _initData() {
-    // Картинки убрали, оставили только текст и координаты
-    final peaks = {
-      'kok_tobe': {
-        'title': 'Kok Tobe',
-        'location': 'ALMATY, KAZAKHSTAN',
-        'badge': 'EASY',
-        'elevation': 1100,
-        'desc': 'Кок-Тобе — гора в Алматы и популярная зона отдыха на вершине. Идеально подходит для легкой вечерней прогулки с панорамным видом на город и канатной дорогой.',
-        'lat': 43.2328,
-        'lng': 76.9727,
-      },
-      'shymbulak': {
-        'title': 'Shymbulak',
-        'location': 'ALMATY, KAZAKHSTAN',
-        'badge': 'MIDDLE',
-        'elevation': 2260,
-        'desc': 'Шымбулак — крупнейший горнолыжный курорт в Центральной Азии. Расположен в живописном ущелье Заилийского Алатау. Отличное место для хайкинга летом.',
-        'lat': 43.1283,
-        'lng': 77.0806,
-      },
-      'bap': {
-        'title': 'Big Almaty Peak',
-        'location': 'ALMATY, KAZAKHSTAN',
-        'badge': 'HARD',
-        'elevation': 3680,
-        'desc': 'Большой Алматинский Пик — величественная вершина в форме пирамиды. Подъем требует хорошей физической подготовки, но награждает невероятными видами на БАО.',
-        'lat': 43.0601,
-        'lng': 76.9333,
-      }
-    };
-
-    peakData = peaks[widget.routeId] ?? peaks['kok_tobe']!;
-    _fetchWeather(peakData['lat'], peakData['lng']);
-  }
-
-  Future<void> _fetchWeather(double lat, double lon) async {
-    try {
-      final response = await _dio.get('https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true');
-      if (response.statusCode == 200) {
-        final current = response.data['current_weather'];
-        final int temp = current['temperature'].round();
-        final int code = current['weathercode'];
-        setState(() {
-          _weatherText = '$temp°C';
-          _weatherIcon = _getWeatherIcon(code);
-        });
-      }
-    } catch (e) {
-      setState(() => _weatherText = '--');
-    }
-  }
-
-  IconData _getWeatherIcon(int code) {
-    if (code == 0) return Icons.wb_sunny_rounded;
-    if (code <= 3) return Icons.cloud_queue_rounded;
-    if (code <= 67) return Icons.water_drop_rounded;
-    if (code <= 77) return Icons.ac_unit_rounded;
-    return Icons.cloud_rounded;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: CustomScrollView(
-        slivers: [
-          // Шапка с заглушкой вместо фото
-          SliverAppBar(
-            expandedHeight: 400,
-            pinned: true,
-            backgroundColor: const Color(0xFF1E1E1E), // Темный цвет шапки при скролле
-            leading: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: GestureDetector(
-                onTap: () => context.pop(),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      color: Colors.black.withOpacity(0.3),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-                    ),
+    // Получаем список маршрутов из нашего провайдера
+    final routeProvider = Provider.of<RouteProvider>(context);
+
+    // Ищем нужный маршрут по ID
+    // Так как routeId из URL это String, а в модели int, делаем toString()
+    RouteModel? route;
+    try {
+      route = routeProvider.routes.firstWhere((r) => r.id.toString() == routeId);
+    } catch (e) {
+      route = null;
+    }
+
+    // Если маршрут не найден (например, ошибка загрузки)
+    if (route == null) {
+      return Scaffold(
+        backgroundColor: AppTheme.bgDark,
+        appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
+        body: const Center(child: Text('Route not found', style: TextStyle(color: Colors.white))),
+      );
+    }
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppTheme.bgDark,
+        body: Stack(
+          children: [
+            // --- 1. ФОНОВАЯ КАРТИНКА ИЗ БЭКЕНДА ---
+            Positioned(
+              top: 0, left: 0, right: 0,
+              height: MediaQuery.of(context).size.height * 0.55,
+              child: Image.network(
+                route.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(color: const Color(0xFF2C2C2E), child: const Center(child: Icon(Icons.terrain_rounded, size: 80, color: Colors.white10))),
+              ),
+            ),
+            // Градиент для плавного перехода
+            Positioned(
+              top: 0, left: 0, right: 0,
+              height: MediaQuery.of(context).size.height * 0.55,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    colors: [Colors.black.withOpacity(0.4), Colors.transparent, AppTheme.bgDark],
+                    stops: const [0.0, 0.5, 1.0],
                   ),
                 ),
               ),
             ),
-            flexibleSpace: FlexibleSpaceBar(
-              // --- ВОТ НАША ЗАГЛУШКА ВМЕСТО КАРТИНКИ ИЗ ИНТЕРНЕТА ---
-              background: Container(
-                color: const Color(0xFF2C2C2E), // Классический темный Apple-цвет
-                child: const Center(
-                  child: Icon(
-                    Icons.terrain_rounded,
-                    size: 100,
-                    color: Colors.white24, // Полупрозрачная белая иконка горы
-                  ),
+
+            // --- 2. КНОПКА "НАЗАД" ---
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildGlassIconButton(Icons.arrow_back_ios_new_rounded, () => context.pop()),
+                    _buildGlassIconButton(Icons.favorite_border_rounded, () {}),
+                  ],
                 ),
               ),
             ),
-          ),
 
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // --- 3. ИНФОРМАЦИЯ О МАРШРУТЕ ---
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.55,
+                decoration: const BoxDecoration(
+                  color: AppTheme.bgDark,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                ),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: Text(peakData['title'], style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.black))),
-                      _buildBadge(peakData['badge']),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(peakData['location'], style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
-                  const SizedBox(height: 24),
-
-                  Row(
-                    children: [
-                      _buildStatCard(Icons.height_rounded, '${peakData['elevation']}m', 'Elevation'),
-                      const SizedBox(width: 16),
-                      _buildStatCard(_weatherIcon, _weatherText, 'Weather'),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-
-                  const Text('About', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
-                  const SizedBox(height: 12),
-                  Text(peakData['desc'], style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5)),
-                  const SizedBox(height: 32),
-
-                  const Text('Location', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () {
-                      final uniqueTarget = '${peakData['title']}||${DateTime.now().millisecondsSinceEpoch}';
-                      context.go('/map', extra: peakData['title']);
-                    },
-                    child: Container(
-                      height: 160,
-                      width: double.infinity,
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), color: Colors.grey[200]),
-                      clipBehavior: Clip.hardEdge,
-                      child: Stack(
+                      // Бейджики: Категория и Сложность
+                      Row(
                         children: [
-                          FlutterMap(
-                            options: MapOptions(
-                              initialCenter: LatLng(peakData['lat'], peakData['lng']),
-                              initialZoom: 13,
-                              interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-                            ),
-                            children: [
-                              TileLayer(urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'),
-                              MarkerLayer(markers: [
-                                Marker(point: LatLng(peakData['lat'], peakData['lng']), child: const Icon(Icons.location_on_rounded, color: Colors.redAccent, size: 40))
-                              ])
-                            ],
-                          ),
-                          Center(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), borderRadius: BorderRadius.circular(20)),
-                                  child: const Text('Open in Full Map', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                                ),
-                              ),
-                            ),
-                          )
+                          _buildBadge(route.category.toUpperCase(), Colors.blueAccent),
+                          const SizedBox(width: 8),
+                          _buildBadge(route.difficulty.toUpperCase(), _getDifficultyColor(route.difficulty)),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 16),
+
+                      // Название и локация
+                      Text(route.name, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded, color: AppTheme.cardSlate, size: 18),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(route.location, style: const TextStyle(fontSize: 16, color: Colors.white70, fontWeight: FontWeight.w500))),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Статистика (Дистанция и Координаты)
+                      Row(
+                        children: [
+                          _buildStatCard(Icons.route_rounded, '${route.distance} km', 'Distance'),
+                          const SizedBox(width: 16),
+                          _buildStatCard(Icons.explore_rounded, '${route.latitude.toStringAsFixed(2)}, ${route.longitude.toStringAsFixed(2)}', 'Coordinates'),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Описание (пока заглушка, если бэк не отдает поле desc)
+                      const Text('Description', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'A beautiful trail that challenges your stamina but rewards you with breathtaking views. Make sure to bring enough water and wear proper hiking boots.',
+                        style: TextStyle(fontSize: 16, color: Colors.white70, height: 1.5),
+                      ),
+                      const SizedBox(height: 40),
+
+                      // --- 4. КНОПКА "ОТКРЫТЬ НА КАРТЕ" ---
+                      SizedBox(
+                        width: double.infinity,
+                        height: 60,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          onPressed: () {
+                            // Пока передаем имя пика, потом переделаем MapScreen под координаты
+                            context.push('/map', extra: '${route!.name}||${route.latitude},${route.longitude}');
+                          },
+                          child: const Text('View on Map', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                    ],
                   ),
-                  const SizedBox(height: 100),
-                ],
+                ),
               ),
             ),
-          )
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBadge(String diff) {
-    Color c = diff == 'HARD' ? Colors.red : diff == 'EASY' ? Colors.green : Colors.orange;
+  // --- ПОМОЩНИКИ ---
+  Widget _buildGlassIconButton(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white24)),
+            child: Icon(icon, color: Colors.white, size: 24),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getDifficultyColor(String diff) {
+    switch (diff.toUpperCase()) {
+      case 'HARD': return const Color(0xFFFF5252);
+      case 'MEDIUM': return const Color(0xFFFF9F0A);
+      case 'EASY': return const Color(0xFF4CAF50);
+      default: return Colors.grey;
+    }
+  }
+
+  Widget _buildBadge(String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: c.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-      child: Text(diff, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 12)),
+      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+      child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
     );
   }
 
@@ -228,14 +205,14 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white10)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: Colors.black87, size: 28),
+            Icon(icon, color: AppTheme.cardSlate, size: 28),
             const SizedBox(height: 12),
-            Text(val, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
-            Text(label, style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(val, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w600)),
           ],
         ),
       ),

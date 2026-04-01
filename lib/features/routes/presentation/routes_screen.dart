@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../providers/route_provider.dart'; // Подключаем наш новый провайдер
+import '../data/models/route_model.dart'; // Подключаем модель
 
 class RoutesScreen extends StatelessWidget {
   const RoutesScreen({super.key});
@@ -13,15 +15,17 @@ class RoutesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    // Слушаем изменения в маршрутах
+    final routeProvider = Provider.of<RouteProvider>(context);
+
     final String userName = (authProvider.user?.username ?? 'EXPLORER').toUpperCase();
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: AppTheme.bgDark,
-        // --- МАГИЯ ЗДЕСЬ: Отключаем нижнюю границу у SafeArea ---
         body: SafeArea(
-          bottom: false, // <--- Теперь контент будет проваливаться под стеклянную панель!
+          bottom: false,
           child: Column(
             children: [
               // --- 1. СТАТИЧНАЯ ШАПКА ---
@@ -30,25 +34,10 @@ class RoutesScreen extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const Text(
-                      'SHYN',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2.5,
-                      ),
-                    ),
+                    const Text('SHYN', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 2.5)),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: IconButton(
-                        icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 28),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Уведомлений пока нет')),
-                          );
-                        },
-                      ),
+                      child: IconButton(icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 28), onPressed: () {}),
                     ),
                   ],
                 ),
@@ -56,86 +45,69 @@ class RoutesScreen extends StatelessWidget {
 
               // --- 2. СКРОЛЛИРУЕМАЯ ЧАСТЬ ---
               Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
+                child: RefreshIndicator( // Добавили Pull-to-Refresh!
+                  color: Colors.white,
+                  backgroundColor: AppTheme.cardSlate,
+                  onRefresh: () async => await routeProvider.loadRoutes(),
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        Text('MORNING, $userName', style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                        const SizedBox(height: 8),
+                        const Text('Discover the\ngreat outdoors.', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: 0.5)),
+                        const SizedBox(height: 32),
 
-                      // Заголовки
-                      Text(
-                          'MORNING, $userName',
-                          style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.2)
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Discover the\ngreat outdoors.',
-                        style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: 0.5),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Строка поиска и фильтр
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 56,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1E1E1E),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white10),
-                              ),
-                              child: Row(
-                                children: [
+                        // Поиск
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                height: 56, padding: const EdgeInsets.symmetric(horizontal: 16),
+                                decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
+                                child: Row(children: [
                                   const Icon(Icons.search_rounded, color: Colors.white54, size: 28),
                                   const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                        'Search parks, peaks...',
-                                        style: TextStyle(color: Colors.white54.withOpacity(0.5), fontSize: 16)
-                                    ),
-                                  ),
-                                ],
+                                  Expanded(child: Text('Search parks, peaks...', style: TextStyle(color: Colors.white54.withOpacity(0.5), fontSize: 16))),
+                                ]),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            height: 56,
-                            width: 56,
-                            decoration: BoxDecoration(
-                              color: AppTheme.cardSlate,
-                              borderRadius: BorderRadius.circular(16),
+                            const SizedBox(width: 12),
+                            Container(
+                              height: 56, width: 56, decoration: BoxDecoration(color: AppTheme.cardSlate, borderRadius: BorderRadius.circular(16)),
+                              child: IconButton(icon: const Icon(Icons.tune_rounded, color: Colors.white), onPressed: () {}),
                             ),
-                            child: IconButton(
-                              icon: const Icon(Icons.tune_rounded, color: Colors.white),
-                              onPressed: () {},
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
 
-                      // --- КАРТОЧКИ ПИКОВ АЛМАТЫ ---
-                      GestureDetector(
-                        onTap: () => context.go('/routes/kok_tobe'),
-                        child: const RouteCardMock(badge: 'EASY', location: 'ALMATY, KAZAKHSTAN', title: 'Kok Tobe', isLoaded: true),
-                      ),
-                      GestureDetector(
-                        onTap: () => context.go('/routes/shymbulak'),
-                        child: const RouteCardMock(badge: 'MIDDLE', location: 'ALMATY, KAZAKHSTAN', title: 'Shymbulak', isLoaded: true),
-                      ),
-                      GestureDetector(
-                        onTap: () => context.go('/routes/bap'),
-                        child: const RouteCardMock(badge: 'HARD', location: 'ALMATY, KAZAKHSTAN', title: 'Big Almaty Peak', isLoaded: false),
-                      ),
+                        // --- ЛОГИКА ОТОБРАЖЕНИЯ МАРШРУТОВ ---
+                        if (routeProvider.isLoading && routeProvider.routes.isEmpty)
+                          const Center(child: Padding(padding: EdgeInsets.all(32.0), child: CircularProgressIndicator(color: Colors.white)))
+                        else if (routeProvider.error != null && routeProvider.routes.isEmpty)
+                          Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32.0),
+                                child: Text(routeProvider.error!, style: const TextStyle(color: Colors.redAccent), textAlign: TextAlign.center),
+                              )
+                          )
+                        else if (routeProvider.routes.isEmpty)
+                            const Center(child: Padding(padding: EdgeInsets.all(32.0), child: Text('No routes found.', style: TextStyle(color: Colors.white54))))
+                          else
+                          // Генерируем реальные карточки из базы
+                            ...routeProvider.routes.map((route) {
+                              return GestureDetector(
+                                onTap: () => context.go('/routes/${route.id}'), // Передаем реальный ID
+                                child: RouteCardLive(route: route), // Новая карточка для живых данных
+                              );
+                            }),
 
-                      // Отступ внизу, чтобы последняя карточка не пряталась под панелью
-                      const SizedBox(height: 120),
-                    ],
+                        const SizedBox(height: 120),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -147,20 +119,11 @@ class RoutesScreen extends StatelessWidget {
   }
 }
 
-// Класс карточки
-class RouteCardMock extends StatelessWidget {
-  final String badge;
-  final String location;
-  final String title;
-  final bool isLoaded;
+// Новая карточка, которая принимает RouteModel и показывает картинку из сети
+class RouteCardLive extends StatelessWidget {
+  final RouteModel route;
 
-  const RouteCardMock({
-    super.key,
-    required this.badge,
-    required this.location,
-    required this.title,
-    required this.isLoaded,
-  });
+  const RouteCardLive({super.key, required this.route});
 
   @override
   Widget build(BuildContext context) {
@@ -170,19 +133,26 @@ class RouteCardMock extends StatelessWidget {
       decoration: BoxDecoration(
           color: const Color(0xFF2C2C2E),
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))
-          ]
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))]
       ),
       child: Stack(
         children: [
-          const Center(
-            child: Icon(
-              Icons.terrain_rounded,
-              size: 80,
-              color: Colors.white10,
+          // РЕАЛЬНАЯ КАРТИНКА МАРШРУТА
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.network(
+                route.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.terrain_rounded, size: 80, color: Colors.white10)),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(child: CircularProgressIndicator(color: Colors.white24));
+                },
+              ),
             ),
           ),
+
           Positioned(
             bottom: 0, left: 0, right: 0,
             child: ClipRRect(
@@ -192,7 +162,7 @@ class RouteCardMock extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.4),
+                    color: Colors.black.withOpacity(0.5), // Сделал чуть темнее, чтобы текст лучше читался на фото
                     border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
                   ),
                   child: Row(
@@ -202,9 +172,9 @@ class RouteCardMock extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(location, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                            Text(route.location.toUpperCase(), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
                             const SizedBox(height: 6),
-                            Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(route.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                           ],
                         ),
                       ),
@@ -212,10 +182,10 @@ class RouteCardMock extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (isLoaded)
-                            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20)),
+                          // Показываем дистанцию
+                          Text('${route.distance} km', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
                           const SizedBox(width: 8),
-                          _buildPdfDifficultyBadge(badge),
+                          _buildDifficultyBadge(route.difficulty),
                         ],
                       ),
                     ],
@@ -229,11 +199,12 @@ class RouteCardMock extends StatelessWidget {
     );
   }
 
-  Widget _buildPdfDifficultyBadge(String difficulty) {
+  Widget _buildDifficultyBadge(String difficulty) {
     Color badgeColor;
     switch (difficulty.toUpperCase()) {
       case 'HARD': badgeColor = const Color(0xFFFF5252); break;
       case 'EASY': badgeColor = const Color(0xFF4CAF50); break;
+      case 'MEDIUM': badgeColor = const Color(0xFFFF9F0A); break;
       default: badgeColor = const Color(0xFFFFC107);
     }
     return Container(
@@ -244,7 +215,7 @@ class RouteCardMock extends StatelessWidget {
         children: [
           const Icon(Icons.star_rate_rounded, color: Colors.white, size: 16),
           const SizedBox(width: 4),
-          Text(difficulty, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+          Text(difficulty.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
         ],
       ),
     );

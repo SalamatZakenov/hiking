@@ -1,9 +1,12 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import 'core/di/locator.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/providers/auth_provider.dart';
+// Добавляем импорт нашего нового провайдера
+import 'features/routes/providers/route_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 
@@ -18,8 +21,16 @@ void main() async {
   );
 
   runApp(
-    ChangeNotifierProvider.value(
-      value: locator<AuthProvider>(),
+    // Используем MultiProvider для подключения нескольких провайдеров
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(
+          value: locator<AuthProvider>(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => RouteProvider()..loadRoutes(),
+        ),
+      ],
       child: const HikingApp(),
     ),
   );
