@@ -1,5 +1,6 @@
 // lib/features/routes/data/services/route_service.dart
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart'; // Для debugPrint
 import '../models/route_model.dart';
 
 class RouteService {
@@ -10,14 +11,17 @@ class RouteService {
     try {
       final response = await _dio.get(baseUrl);
 
+      // Выводим в консоль ровно то, что ответил сервер!
+      debugPrint('🌍 ОТВЕТ БЭКЕНДА: ${response.data}');
+
       if (response.statusCode == 200) {
-        // Ожидаем, что бэкенд возвращает массив (List)
         final List<dynamic> data = response.data;
         return data.map((json) => RouteModel.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load routes');
+        throw Exception('Failed to load routes. Status: ${response.statusCode}');
       }
     } catch (e) {
+      debugPrint('🔥 ОШИБКА В SERVICE: $e');
       throw Exception('Error fetching routes: $e');
     }
   }

@@ -23,6 +23,8 @@ class RouteDetailsScreen extends StatefulWidget {
 
 class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
   final Dio _dio = Dio();
+  final PageController _pageController = PageController();
+  int _currentImageIndex = 0;
 
   String _weatherText = '...';
   IconData _weatherIcon = Icons.cloud_outlined;
@@ -53,11 +55,11 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
     return Icons.cloud_rounded;
   }
 
-  void _openPhotoViewer(BuildContext context, String imageUrl, int routeId) {
+  void _openGallery(BuildContext context, List<String> images, int initialIndex) {
     showDialog(
       context: context,
       useSafeArea: false,
-      builder: (context) => RoutePhotoViewer(imageUrl: imageUrl, heroTag: 'photo_$routeId'),
+      builder: (context) => RouteGalleryViewer(images: images, initialIndex: initialIndex),
     );
   }
 
@@ -78,20 +80,17 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
     }
 
     if (route == null) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: AppTheme.bgDark,
-        body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Route not found', style: TextStyle(color: Colors.white, fontSize: 18)),
-                const SizedBox(height: 16),
-                FilledButton(onPressed: () => context.go('/routes'), child: const Text('Go Back')),
-              ],
-            )
-        ),
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
       );
     }
+
+    // --- ИСПРАВЛЕННАЯ ЛОГИКА ---
+    // Если картинок нет, оставляем массив пустым, чтобы не передавать пустую строку в Image.network
+    final displayImages = route.allImages.isNotEmpty
+        ? route.allImages
+        : (route.imageUrl.isNotEmpty ? [route.imageUrl] : <String>[]);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -99,33 +98,76 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
         backgroundColor: AppTheme.bgDark,
         body: Stack(
           children: [
-            // --- 1. ЕДИНЫЙ СКРОЛЛИРУЕМЫЙ БЛОК ---
             SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
-                  // Фотография маршрута
-                  GestureDetector(
-                    onTap: () => _openPhotoViewer(context, route!.imageUrl, route.id),
-                    child: Hero(
-                      tag: 'photo_${route.id}',
-                      child: Container(
+                  // --- КАРУСЕЛЬ ФОТОГРАФИЙ ---
+                  Stack(
+                    children: [
+                      SizedBox(
                         height: MediaQuery.of(context).size.height * 0.45,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2C2C2E),
-                          border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
-                        ),
-                        child: Image.network(
-                          route.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.terrain_rounded, size: 80, color: Colors.white10)),
+                        child: displayImages.isEmpty
+                        // Если массив пустой, показываем заглушку напрямую (без Image.network)
+                            ? Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2C2C2E),
+                            border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
+                          ),
+                          child: const Center(child: Icon(Icons.terrain_rounded, size: 80, color: Colors.white10)),
+                        )
+                        // Если картинки есть, строим карусель
+                            : PageView.builder(
+                          controller: _pageController,
+                          onPageChanged: (index) => setState(() => _currentImageIndex = index),
+                          itemCount: displayImages.length,
+                          itemBuilder: (context, index) {
+                            return GestureDetector(
+                              onTap: () => _openGallery(context, displayImages, index),
+                              child: Hero(
+                                tag: 'photo_${route!.id}_$index',
+                                child: Image.network(
+                                  displayImages[index],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: const Color(0xFF2C2C2E),
+                                    child: const Center(child: Icon(Icons.terrain_rounded, size: 80, color: Colors.white10)),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
-                    ),
+
+                      Positioned(
+                        top: 0, left: 0, right: 0, height: 120,
+                        child: Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.6), Colors.transparent]))),
+                      ),
+
+                      if (displayImages.length > 1)
+                        Positioned(
+                          bottom: 20, left: 0, right: 0,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(displayImages.length, (index) {
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                height: 8,
+                                width: _currentImageIndex == index ? 24 : 8,
+                                decoration: BoxDecoration(
+                                  color: _currentImageIndex == index ? Colors.white : Colors.white.withOpacity(0.4),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                    ],
                   ),
 
-                  // Информация о маршруте
+                  // Контент
                   Container(
                     width: double.infinity,
                     decoration: const BoxDecoration(color: AppTheme.bgDark),
@@ -141,7 +183,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-
                         Text(route.name, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1)),
                         const SizedBox(height: 8),
                         Row(
@@ -152,30 +193,25 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                           ],
                         ),
                         const SizedBox(height: 32),
-
                         Row(
                           children: [
-                            _buildStatCard(Icons.route_rounded, '${route.distance} km', 'Distance'),
+                            _buildStatCard(Icons.route_rounded, route.calculatedDistance != null ? '${route.calculatedDistance!.toStringAsFixed(1)} km' : '? km', 'Distance'),
+                            const SizedBox(width: 16),
+                            _buildStatCard(Icons.height_rounded, '${route.elevation.toInt()} m', 'Elevation'),
                             const SizedBox(width: 16),
                             _buildStatCard(_weatherIcon, _weatherText, 'Weather'),
                           ],
                         ),
                         const SizedBox(height: 32),
-
                         const Text('Description', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                         const SizedBox(height: 12),
-                        const Text(
-                          'A beautiful trail that challenges your stamina but rewards you with breathtaking views. Make sure to bring enough water and wear proper hiking boots.',
-                          style: TextStyle(fontSize: 16, color: Colors.white70, height: 1.5),
-                        ),
+                        Text(route.description, style: const TextStyle(fontSize: 16, color: Colors.white70, height: 1.5)),
                         const SizedBox(height: 40),
 
-                        // --- 3. ИСПРАВЛЕННЫЙ МАКЕТ КАРТЫ (ЕДИНАЯ КЛИКАБЕЛЬНАЯ ЗОНА) ---
+                        // Карта
                         GestureDetector(
-                          onTap: () {
-                            context.push('/map', extra: '${route!.name}||${route.latitude},${route.longitude}');
-                          },
-                          behavior: HitTestBehavior.opaque, // Клик срабатывает в любой точке этой области
+                          onTap: () => context.push('/map', extra: '${route!.name}||${route.latitude},${route.longitude}'),
+                          behavior: HitTestBehavior.opaque,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -188,36 +224,16 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                               ),
                               const SizedBox(height: 16),
                               Container(
-                                height: 180,
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(color: Colors.white10),
-                                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))]
-                                ),
+                                height: 180, width: double.infinity,
+                                decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white10)),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(24),
                                   child: IgnorePointer(
                                     child: FlutterMap(
-                                      options: MapOptions(
-                                        initialCenter: LatLng(route.latitude, route.longitude),
-                                        initialZoom: 13.0,
-                                        interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-                                      ),
+                                      options: MapOptions(initialCenter: LatLng(route.latitude, route.longitude), initialZoom: 13.0, interactionOptions: const InteractionOptions(flags: InteractiveFlag.none)),
                                       children: [
-                                        TileLayer(
-                                          urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                                          retinaMode: true,
-                                        ),
-                                        MarkerLayer(
-                                          markers: [
-                                            Marker(
-                                              point: LatLng(route.latitude, route.longitude),
-                                              width: 40, height: 40,
-                                              child: const Icon(Icons.location_on, color: Color(0xFFFF453A), size: 40),
-                                            ),
-                                          ],
-                                        ),
+                                        TileLayer(urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', retinaMode: true),
+                                        MarkerLayer(markers: [Marker(point: LatLng(route.latitude, route.longitude), width: 40, height: 40, child: const Icon(Icons.location_on, color: Color(0xFFFF453A), size: 40))]),
                                       ],
                                     ),
                                   ),
@@ -226,7 +242,7 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 100), // Отступ внизу
+                        const SizedBox(height: 100),
                       ],
                     ),
                   ),
@@ -234,17 +250,13 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
               ),
             ),
 
-            // --- 4. ФИКСИРОВАННЫЕ ВЕРХНИЕ КНОПКИ ---
             Positioned(
               top: MediaQuery.of(context).padding.top + 8,
-              left: 16,
-              right: 16,
+              left: 16, right: 16,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildGlassIconButton(Icons.arrow_back_ios_new_rounded, () {
-                    if (context.canPop()) { context.pop(); } else { context.go('/routes'); }
-                  }),
+                  _buildGlassIconButton(Icons.arrow_back_ios_new_rounded, () => context.canPop() ? context.pop() : context.go('/routes')),
                   _buildGlassIconButton(Icons.favorite_border_rounded, () {}),
                 ],
               ),
@@ -255,11 +267,9 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
     );
   }
 
-  // --- ПОМОЩНИКИ ---
   Widget _buildGlassIconButton(IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
@@ -275,12 +285,9 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
   }
 
   Color _getDifficultyColor(String diff) {
-    switch (diff.toUpperCase()) {
-      case 'HARD': return const Color(0xFFFF5252);
-      case 'MEDIUM': return const Color(0xFFFF9F0A);
-      case 'EASY': return const Color(0xFF4CAF50);
-      default: return Colors.grey;
-    }
+    if (diff.toUpperCase() == 'HARD') return const Color(0xFFFF5252);
+    if (diff.toUpperCase() == 'MEDIUM') return const Color(0xFFFF9F0A);
+    return const Color(0xFF4CAF50);
   }
 
   Widget _buildBadge(String text, Color color) {
@@ -294,16 +301,15 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
   Widget _buildStatCard(IconData icon, String val, String label) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white10)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: AppTheme.cardSlate, size: 28),
-            const SizedBox(height: 12),
-            Text(val, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w600)),
+            Icon(icon, color: AppTheme.cardSlate, size: 24),
+            const SizedBox(height: 8),
+            Text(val, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -311,11 +317,26 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
   }
 }
 
-class RoutePhotoViewer extends StatelessWidget {
-  final String imageUrl;
-  final String heroTag;
+class RouteGalleryViewer extends StatefulWidget {
+  final List<String> images;
+  final int initialIndex;
 
-  const RoutePhotoViewer({super.key, required this.imageUrl, required this.heroTag});
+  const RouteGalleryViewer({super.key, required this.images, required this.initialIndex});
+
+  @override
+  State<RouteGalleryViewer> createState() => _RouteGalleryViewerState();
+}
+
+class _RouteGalleryViewerState extends State<RouteGalleryViewer> {
+  late PageController _galleryController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _galleryController = PageController(initialPage: widget.initialIndex);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -324,41 +345,26 @@ class RoutePhotoViewer extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false,
-        actions: [
-          Hero(
-            tag: '${heroTag}_appbar',
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                margin: const EdgeInsets.only(right: 16),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white, size: 26),
-                  onPressed: () => Navigator.pop(context),
-                ),
+        leading: IconButton(icon: const Icon(Icons.close, color: Colors.white, size: 28), onPressed: () => Navigator.pop(context)),
+        title: Text('${_currentIndex + 1} / ${widget.images.length}', style: const TextStyle(color: Colors.white, fontSize: 16)),
+        centerTitle: true,
+      ),
+      body: PageView.builder(
+        controller: _galleryController,
+        itemCount: widget.images.length,
+        onPageChanged: (index) => setState(() => _currentIndex = index),
+        itemBuilder: (context, index) {
+          return InteractiveViewer(
+            minScale: 0.5, maxScale: 4.0,
+            child: Center(
+              child: Image.network(
+                widget.images[index],
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) => progress == null ? child : const Center(child: CircularProgressIndicator(color: Colors.white24)),
               ),
             ),
-          ),
-        ],
-      ),
-      body: Center(
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 3.0,
-          child: Hero(
-            tag: heroTag,
-            child: Image.network(
-              imageUrl,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(Icons.terrain_rounded, size: 80, color: Colors.white10),
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return const Center(child: CircularProgressIndicator(color: Colors.white24));
-              },
-            ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

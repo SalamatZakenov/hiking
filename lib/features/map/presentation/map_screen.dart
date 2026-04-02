@@ -435,7 +435,12 @@ class _MapScreenState extends State<MapScreen> {
                 children: [
                   const Icon(Icons.route_rounded, color: Colors.white54, size: 18),
                   const SizedBox(width: 4),
-                  Text('${_selectedRoute!.distance} km', style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text(
+                      _selectedRoute!.calculatedDistance != null
+                          ? '${_selectedRoute!.calculatedDistance!.toStringAsFixed(1)} km'
+                          : '? km',
+                      style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600)
+                  ),
                   const SizedBox(width: 16),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

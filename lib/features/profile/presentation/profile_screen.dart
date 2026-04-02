@@ -5,13 +5,22 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  // 0 - Publications, 1 - Completed
+  int _selectedTabIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
+    final String username = user?.username ?? 'explorer';
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -20,8 +29,8 @@ class ProfileScreen extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          title: const Text('My Diary', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          centerTitle: false,
+          title: Text('@$username', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+          centerTitle: true,
           actions: [
             IconButton(
               icon: const Icon(Icons.settings_outlined, color: Colors.white),
@@ -104,38 +113,28 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
-              // --- 3. ЗАГОЛОВОК ЛЕНТЫ ---
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24.0),
-                child: Text('Recent Activities', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 16),
-
-              // --- 4. ЛЕНТА ПОСТОВ (ACTIVITY FEED) ---
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: 3,
-                itemBuilder: (context, index) {
-                  return ActivityPostCard(
-                    username: user?.username ?? 'Explorer',
-                    routeName: index == 0 ? 'Kok Tobe Night Trail' : 'Big Almaty Peak',
-                    date: index == 0 ? 'Yesterday at 18:30' : 'Oct 12, 2025',
-                    caption: index == 0
-                        ? 'Great evening hike! The city lights were amazing. A bit muddy on the way down, but totally worth it. 🌃🥾'
-                        : 'Finally conquered BAP! The altitude hit hard, but the view is breathtaking.',
-                    distance: index == 0 ? '4.2 km' : '8.5 km',
-                    duration: index == 0 ? '1h 15m' : '4h 30m',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Открываем детали маршрута ${index == 0 ? "Kok Tobe" : "BAP"}...')),
-                      );
-                    },
-                  );
-                },
+              // --- 2. ПЕРЕКЛЮЧАТЕЛЬ ВКЛАДОК ---
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1), width: 1)),
+                ),
+                child: Row(
+                  children: [
+                    _buildTabOption('Publications', 0),
+                    _buildTabOption('Completed', 1),
+                  ],
+                ),
               ),
 
-              const SizedBox(height: 100), // Отступ под навигацию
+              // --- 3. КОНТЕНТ ВКЛАДОК ---
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: _selectedTabIndex == 0
+                    ? _buildPublicationsList()
+                    : _buildCompletedList(),
+              ),
+
+              const SizedBox(height: 100), // Отступ под нижнюю панель навигации
             ],
           ),
         ),
@@ -166,72 +165,79 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  void _showSettingsPanel(BuildContext context, AuthProvider authProvider) {
-    showModalBottomSheet(
-        context: context, useRootNavigator: true, backgroundColor: const Color(0xFF1E1E1E),
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        builder: (context) {
-          return SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 12),
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-                const SizedBox(height: 24),
-                const Text('Settings', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.edit_outlined, color: Colors.white54),
-                  title: const Text('Edit Profile', style: TextStyle(color: Colors.white)),
-                  onTap: () => Navigator.pop(context),
-                ),
-                const Divider(color: Colors.white10, height: 32),
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.redAccent),
-                  title: const Text('Log Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    authProvider.logout();
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
+  // --- ВИДЖЕТЫ ВКЛАДОК ---
+
+  Widget _buildTabOption(String title, int index) {
+    final isActive = _selectedTabIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTabIndex = index),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isActive ? Colors.white : Colors.transparent,
+                width: 2,
+              ),
             ),
-          );
-        }
+          ),
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isActive ? Colors.white : Colors.white54,
+              fontSize: 16,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
     );
   }
-}
 
-// --- ВИДЖЕТ КАРТОЧКИ ПОСТА (ДНЕВНИКА) ---
-class ActivityPostCard extends StatelessWidget {
-  final String username;
-  final String routeName;
-  final String date;
-  final String caption;
-  final String distance;
-  final String duration;
-  final VoidCallback onTap;
-
-  const ActivityPostCard({
-    super.key, required this.username, required this.routeName,
-    required this.date, required this.caption, required this.distance,
-    required this.duration, required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
-        decoration: BoxDecoration(
-            color: const Color(0xFF2C2C2E),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))
-            ]
+  Widget _buildPublicationsList() {
+    return Column(
+      children: [
+        _buildPublicationCard(
+          location: 'Furmanov Peak',
+          date: 'Yesterday at 14:30',
+          imageUrl: 'https://images.unsplash.com/photo-1522163182402-834f871fd851?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+          caption: 'Great weather, but the last kilometer was tough! 🏔️☀️',
+          likes: '124',
+          comments: '12',
         ),
+        _buildPublicationCard(
+          location: 'Kok Tobe',
+          date: 'Oct 12, 2025',
+          imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+          caption: 'Evening stroll. The city lights are mesmerizing from up here. 🌆',
+          likes: '89',
+          comments: '4',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompletedList() {
+    return Column(
+      children: [
+        _buildCompletedWorkoutCard('Furmanov Peak', 'Oct 24, 2025', '14.5 km', '4h 20m', 'HARD'),
+        _buildCompletedWorkoutCard('Kok Tobe', 'Oct 12, 2025', '6.2 km', '1h 15m', 'EASY'),
+        _buildCompletedWorkoutCard('Butakovka Waterfall', 'Sep 28, 2025', '8.4 km', '2h 10m', 'MEDIUM'),
+      ],
+    );
+  }
+
+  // --- КОМПОНЕНТЫ ДЛЯ ПУБЛИКАЦИЙ ---
+
+  Widget _buildPublicationCard({required String location, required String date, required String imageUrl, required String caption, required String likes, required String comments}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white10)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -239,59 +245,25 @@ class ActivityPostCard extends StatelessWidget {
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  CircleAvatar(radius: 18, backgroundColor: Colors.white10, child: const Icon(Icons.person, size: 20, color: Colors.white54)),
-                  const SizedBox(width: 12),
+                  const Icon(Icons.location_on_rounded, color: Colors.blueAccent, size: 20),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(username, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(location, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                         Text(date, style: const TextStyle(color: Colors.white54, fontSize: 12)),
                       ],
                     ),
                   ),
-                  const Icon(Icons.more_vert, color: Colors.white54, size: 20),
+                  const Icon(Icons.more_horiz_rounded, color: Colors.white54),
                 ],
               ),
             ),
-            Container(
-              height: 200, width: double.infinity, color: const Color(0xFF1E1E1E),
-              child: Stack(
-                children: [
-                  const Center(child: Icon(Icons.terrain_rounded, size: 80, color: Colors.white10)),
-                  Positioned(
-                    top: 12, left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(12)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.location_on, color: AppTheme.accentYellow, size: 14),
-                          const SizedBox(width: 4),
-                          Text(routeName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            Image.network(imageUrl, height: 250, width: double.infinity, fit: BoxFit.cover),
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      _buildMiniStat(Icons.route_outlined, distance),
-                      const SizedBox(width: 16),
-                      _buildMiniStat(Icons.timer_outlined, duration),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4)),
-                ],
-              ),
+              child: Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4)),
             ),
             const Divider(color: Colors.white10, height: 1),
             Padding(
@@ -300,11 +272,11 @@ class ActivityPostCard extends StatelessWidget {
                 children: [
                   const Icon(Icons.favorite_border_rounded, color: Colors.white54, size: 24),
                   const SizedBox(width: 6),
-                  const Text('24', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+                  Text(likes, style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
                   const SizedBox(width: 24),
                   const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white54, size: 22),
                   const SizedBox(width: 6),
-                  const Text('5', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+                  Text(comments, style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
                   const Spacer(),
                   const Icon(Icons.share_outlined, color: Colors.white54, size: 22),
                 ],
@@ -316,13 +288,138 @@ class ActivityPostCard extends StatelessWidget {
     );
   }
 
+  // --- КОМПОНЕНТЫ ДЛЯ ЗАВЕРШЕННЫХ МАРШРУТОВ ---
+
+  Widget _buildCompletedWorkoutCard(String title, String date, String distance, String time, String difficulty) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(date, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildMiniStat(Icons.route_rounded, distance),
+              _buildMiniStat(Icons.timer_outlined, time),
+              _buildDifficultyBadge(difficulty),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- ВСПОМОГАТЕЛЬНЫЕ ЭЛЕМЕНТЫ ---
+
+  Widget _buildProfileStat(String value, String label) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+      ],
+    );
+  }
+
   Widget _buildMiniStat(IconData icon, String text) {
     return Row(
       children: [
         Icon(icon, color: AppTheme.cardSlate, size: 16),
         const SizedBox(width: 4),
-        Text(text, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+        Text(text, style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600)),
       ],
+    );
+  }
+
+  Widget _buildDifficultyBadge(String difficulty) {
+    Color badgeColor;
+    switch (difficulty.toUpperCase()) {
+      case 'HARD': badgeColor = const Color(0xFFFF5252); break;
+      case 'EASY': badgeColor = const Color(0xFF4CAF50); break;
+      case 'MEDIUM': badgeColor = const Color(0xFFFF9F0A); break;
+      default: badgeColor = const Color(0xFFFFC107);
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(color: badgeColor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+      child: Text(difficulty.toUpperCase(), style: TextStyle(color: badgeColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+    );
+  }
+
+  // --- ШТОРКА НАСТРОЕК ---
+  void _showSettingsPanel(BuildContext context, AuthProvider authProvider) {
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 32),
+
+            // --- СЮДА ПЕРЕЕХАЛИ КНОПКИ ---
+            _buildSettingsItem(Icons.edit_rounded, 'Edit Profile'),
+            _buildSettingsItem(Icons.ios_share_rounded, 'Share Profile'),
+
+            // Остальные настройки
+            _buildSettingsItem(Icons.person_outline_rounded, 'Account Settings'),
+            _buildSettingsItem(Icons.notifications_none_rounded, 'Notifications'),
+            _buildSettingsItem(Icons.download_done_rounded, 'Offline Maps'),
+            _buildSettingsItem(Icons.help_outline_rounded, 'Help & Support'),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: Colors.redAccent.withOpacity(0.1), foregroundColor: Colors.redAccent, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Log Out', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  Navigator.pop(context);
+                  authProvider.logout();
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsItem(IconData icon, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white70, size: 28),
+          const SizedBox(width: 16),
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500)),
+          const Spacer(),
+          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 16),
+        ],
+      ),
     );
   }
 }

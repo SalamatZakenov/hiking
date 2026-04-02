@@ -1,5 +1,7 @@
 // lib/features/routes/providers/route_provider.dart
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import '../data/models/route_model.dart';
 import '../data/services/route_service.dart';
 
@@ -17,15 +19,44 @@ class RouteProvider with ChangeNotifier {
   Future<void> loadRoutes() async {
     _isLoading = true;
     _error = null;
-    notifyListeners(); // Говорим экрану: "Покажи крутилку загрузки"
+    notifyListeners();
 
     try {
       _routes = await _service.fetchRoutes();
+      debugPrint('✅ Успешно спарсили маршрутов: ${_routes.length}');
+      await _calculateDistances();
     } catch (e) {
-      _error = 'Не удалось загрузить маршруты. Проверьте интернет.';
+      debugPrint('❌ ОШИБКА В PROVIDER: $e');
+      // Теперь скрытых ошибок не будет, мы выведем её на экран!
+      _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners(); // Говорим экрану: "Обнови список, данные пришли"
+      notifyListeners();
+    }
+  }
+
+  Future<void> _calculateDistances() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final userLatLng = LatLng(position.latitude, position.longitude);
+      final distanceCalc = const Distance();
+
+      for (var route in _routes) {
+        final routeLatLng = LatLng(route.latitude, route.longitude);
+        final meters = distanceCalc.distance(userLatLng, routeLatLng);
+        route.calculatedDistance = meters / 1000;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Ошибка геолокации: $e');
     }
   }
 }

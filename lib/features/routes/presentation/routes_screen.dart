@@ -203,7 +203,10 @@ class RouteCardLive extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('${route.distance} km', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                          Text(
+                              route.calculatedDistance != null ? '${route.calculatedDistance!.toStringAsFixed(1)} km' : '? km',
+                              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)
+                          ),
                           const SizedBox(width: 8),
                           _buildDifficultyBadge(route.difficulty),
                         ],
