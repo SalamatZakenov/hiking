@@ -12,6 +12,8 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/routes/presentation/route_details_screen.dart';
+import '../../features/community/presentation/community_screen.dart';
+import '../../features/liked/presentation/liked_screen.dart';
 
 class AppRouter {
   static final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -91,10 +93,7 @@ class AppRouter {
               routes: [
                 GoRoute(
                   path: '/community',
-                  builder: (context, state) => const Scaffold(
-                    backgroundColor: AppTheme.bgDark,
-                    body: Center(child: Text('Community Hub\nComing Soon', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.cardSlate, fontSize: 24, fontWeight: FontWeight.bold))),
-                  ),
+                  builder: (context, state) => const CommunityScreen(), // <--- Ставим наш новый экран!
                 ),
               ],
             ),
@@ -114,10 +113,7 @@ class AppRouter {
                 routes: [
                   GoRoute(
                     path: '/liked',
-                    builder: (context, state) => const Scaffold(
-                      backgroundColor: AppTheme.bgDark,
-                      body: Center(child: Text('Liked Routes\nComing Soon', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.cardSlate, fontSize: 24, fontWeight: FontWeight.bold))),
-                    ),
+                    builder: (context, state) => const LikedScreen(), // <-- Наш новый крутой экран!
                   )
                 ]
             ),

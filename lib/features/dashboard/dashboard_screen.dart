@@ -1,5 +1,5 @@
 // lib/features/dashboard/dashboard_screen.dart
-import 'dart:ui'; // <--- Обязательно добавляем для эффекта размытия (стекла)
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
