@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../data/models/route_model.dart';
 import '../data/services/route_service.dart';
+import '../utils/gpx_parser.dart'; // Наш парсер
 
 class RouteProvider with ChangeNotifier {
   final RouteService _service = RouteService();
@@ -23,11 +24,40 @@ class RouteProvider with ChangeNotifier {
 
     try {
       _routes = await _service.fetchRoutes();
-      debugPrint('✅ Успешно спарсили маршрутов: ${_routes.length}');
+
+      // ПРОХОДИМСЯ ПО КАЖДОМУ И ИЩЕМ ЛОКАЛЬНЫЙ GPX ФАЙЛ
+      for (int i = 0; i < _routes.length; i++) {
+        String? localGpxPath;
+
+        // ИЩЕМ ПО АНГЛИЙСКОМУ ИМЕНИ ИЗ БАЗЫ!
+        final routeNameLower = _routes[i].name.toLowerCase();
+
+        if (routeNameLower.contains('furmanova') || routeNameLower.contains('фурманов')) {
+          localGpxPath = 'assets/routes/furmanov.gpx';
+        } else if (routeNameLower.contains('panorama') || routeNameLower.contains('панорама')) {
+          localGpxPath = 'assets/routes/panorama.gpx';
+        }
+
+        // Если нашли файл - Вклеиваем его координаты
+        if (localGpxPath != null) {
+          final gpxData = await GpxParser.loadRoute(localGpxPath);
+
+          if (gpxData != null && gpxData.trackPoints.isNotEmpty) {
+            _routes[i] = _routes[i].copyWith(
+              latitude: gpxData.trackPoints.last.latitude,
+              longitude: gpxData.trackPoints.last.longitude,
+              trailhead: gpxData.trackPoints.first,
+              trackPoints: gpxData.trackPoints,
+              waypoints: gpxData.waypoints,
+            );
+          }
+        }
+      }
+
+      debugPrint('✅ Успешно спарсили и склеили маршрутов: ${_routes.length}');
       await _calculateDistances();
     } catch (e) {
       debugPrint('❌ ОШИБКА В PROVIDER: $e');
-      // Теперь скрытых ошибок не будет, мы выведем её на экран!
       _error = e.toString();
     } finally {
       _isLoading = false;
@@ -35,6 +65,7 @@ class RouteProvider with ChangeNotifier {
     }
   }
 
+  // ... (метод _calculateDistances оставляем без изменений)
   Future<void> _calculateDistances() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -56,7 +87,7 @@ class RouteProvider with ChangeNotifier {
         route.calculatedDistance = meters / 1000;
       }
     } catch (e) {
-      debugPrint('⚠️ Ошибка геолокации: $e');
+      debugPrint('❌ Ошибка при расчете дистанции: $e');
     }
   }
 }

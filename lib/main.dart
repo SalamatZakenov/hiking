@@ -8,9 +8,13 @@ import 'features/auth/providers/auth_provider.dart';
 import 'features/routes/providers/route_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
+import 'features/tracking/providers/tracking_provider.dart';
 
 void main() async {
+  // Обязательно вызываем это первыми
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Инициализируем locator (твои зависимости)
   setupLocator();
 
   SystemChrome.setSystemUIOverlayStyle(
@@ -19,12 +23,20 @@ void main() async {
     ),
   );
 
+  // --- МАГИЯ СОХРАНЕНИЯ СЕССИИ ---
+  // Получаем AuthProvider из локатора и проверяем память телефона
+  final authProvider = locator<AuthProvider>();
+  await authProvider.checkAuthStatus();
+
   runApp(
     // Используем MultiProvider для подключения нескольких провайдеров
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(
-          value: locator<AuthProvider>(),
+          value: authProvider, // Передаем провайдер, который уже проверил память!
+        ),
+        ChangeNotifierProvider.value(
+          value: locator<TrackingProvider>(),
         ),
         ChangeNotifierProvider(
           create: (_) => RouteProvider()..loadRoutes(),

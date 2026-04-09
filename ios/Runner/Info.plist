@@ -90,6 +90,11 @@
         			</array>
         		</dict>
         	</array>
-
+        <key>UIBackgroundModes</key>
+        	<array>
+        		<string>location</string>
+        	</array>
+        	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+        	<string>This app needs access to your location to record your hiking tracks even when the screen is locked.</string>
 	</dict>
 </plist>
