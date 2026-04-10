@@ -1,7 +1,6 @@
 // lib/features/routes/data/models/route_model.dart
 import 'package:latlong2/latlong.dart';
 
-// 1. НАШ НОВЫЙ КЛАСС ДЛЯ МЕТОК
 class WaypointData {
   final LatLng location;
   final String name;
@@ -19,19 +18,27 @@ class RouteModel {
 
   final LatLng trailhead;
   final List<LatLng> trackPoints;
-  final List<WaypointData> waypoints; // 2. НОВОЕ ПОЛЕ ДЛЯ МЕТОК ИЗ GPX
+  final List<WaypointData> waypoints;
 
   final double distanceKm;
   final double elevationGainMeters;
   final String difficulty;
+  final String routeCategory;
   final String estimatedTime;
   final String imageUrl;
+
+  final String? gpxUrl;
+
+  // НОВОЕ ПОЛЕ: Настоящая локация из Базы Данных
+  final String parsedLocation;
 
   double? calculatedDistance;
   double? calculatedDurationMinutes;
 
-  String get location => 'Алматы, Заилийский Алатау';
-  String get category => difficulty;
+  // Теперь мы отдаем локацию из БД. Если бэкенд пришлет null, покажем дефолтную.
+  String get location => parsedLocation.isNotEmpty ? parsedLocation : 'Заилийский Алатау';
+
+  String get category => routeCategory;
   double get elevation => elevationGainMeters;
   List<String> get allImages => [imageUrl];
 
@@ -43,12 +50,15 @@ class RouteModel {
     required this.longitude,
     required this.trailhead,
     required this.trackPoints,
-    required this.waypoints, // Добавили в конструктор
+    required this.waypoints,
     required this.distanceKm,
     required this.elevationGainMeters,
     required this.difficulty,
+    required this.routeCategory,
     required this.estimatedTime,
     required this.imageUrl,
+    required this.parsedLocation, // Добавили в конструктор
+    this.gpxUrl,
     this.calculatedDistance,
     this.calculatedDurationMinutes,
   });
@@ -65,8 +75,11 @@ class RouteModel {
     double? distanceKm,
     double? elevationGainMeters,
     String? difficulty,
+    String? routeCategory,
     String? estimatedTime,
     String? imageUrl,
+    String? parsedLocation,
+    String? gpxUrl,
     double? calculatedDistance,
     double? calculatedDurationMinutes,
   }) {
@@ -78,12 +91,15 @@ class RouteModel {
       longitude: longitude ?? this.longitude,
       trailhead: trailhead ?? this.trailhead,
       trackPoints: trackPoints ?? this.trackPoints,
-      waypoints: waypoints ?? this.waypoints, // Копируем метки
+      waypoints: waypoints ?? this.waypoints,
       distanceKm: distanceKm ?? this.distanceKm,
       elevationGainMeters: elevationGainMeters ?? this.elevationGainMeters,
       difficulty: difficulty ?? this.difficulty,
+      routeCategory: routeCategory ?? this.routeCategory,
       estimatedTime: estimatedTime ?? this.estimatedTime,
       imageUrl: imageUrl ?? this.imageUrl,
+      parsedLocation: parsedLocation ?? this.parsedLocation, // Копируем
+      gpxUrl: gpxUrl ?? this.gpxUrl,
       calculatedDistance: calculatedDistance ?? this.calculatedDistance,
       calculatedDurationMinutes: calculatedDurationMinutes ?? this.calculatedDurationMinutes,
     );
@@ -112,13 +128,17 @@ class RouteModel {
           ? (json['trackPoints'] as List).map((p) => LatLng((p['lat'] as num).toDouble(), (p['lng'] as num).toDouble())).toList()
           : [],
 
-      waypoints: [], // Изначально пусто, мы заполним это из GPX
+      waypoints: [],
 
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
       elevationGainMeters: (json['elevationGainMeters'] as num?)?.toDouble() ?? (json['elevation'] as num?)?.toDouble() ?? 0.0,
       difficulty: json['difficulty']?.toString() ?? 'UNKNOWN',
+      routeCategory: json['category']?.toString() ?? 'PEAK',
       estimatedTime: json['estimatedTime']?.toString() ?? 'N/A',
       imageUrl: parsedImageUrl,
+
+      parsedLocation: json['location']?.toString() ?? '', // <-- ЧИТАЕМ ИЗ БАЗЫ!
+      gpxUrl: json['gpxUrl']?.toString(),
     );
   }
 }

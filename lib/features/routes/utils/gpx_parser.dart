@@ -1,9 +1,8 @@
 // lib/features/routes/utils/gpx_parser.dart
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:latlong2/latlong.dart';
-import '../data/models/route_model.dart'; // Импортируем WaypointData
+import 'package:http/http.dart' as http; // Импортируем HTTP клиент
+import '../data/models/route_model.dart';
 
-// Специальный класс, чтобы вернуть сразу два списка
 class ParsedGpx {
   final List<LatLng> trackPoints;
   final List<WaypointData> waypoints;
@@ -11,11 +10,20 @@ class ParsedGpx {
 }
 
 class GpxParser {
-  static Future<ParsedGpx?> loadRoute(String assetPath) async {
+  // Теперь принимаем сетевой URL, а не путь к локальному ассету
+  static Future<ParsedGpx?> loadRouteFromNetwork(String url) async {
     try {
-      final String gpxString = await rootBundle.loadString(assetPath);
+      // 1. СКАЧИВАЕМ ФАЙЛ ПО ССЫЛКЕ ОТ БЭКЕНДА
+      final response = await http.get(Uri.parse(url));
 
-      // 1. Читаем линию (trackPoints)
+      if (response.statusCode != 200) {
+        print("❌ Ошибка скачивания GPX. Статус: ${response.statusCode}");
+        return null;
+      }
+
+      final String gpxString = response.body;
+
+      // 2. Читаем линию (trackPoints)
       final List<LatLng> points = [];
       final RegExp trkRegExp = RegExp(r'<trkpt[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"');
       for (final match in trkRegExp.allMatches(gpxString)) {
@@ -25,9 +33,9 @@ class GpxParser {
       }
 
       final List<LatLng> optimizedPoints = [];
-      for (int i = 0; i < points.length; i += 3) optimizedPoints.add(points[i]); // Оптимизация
+      for (int i = 0; i < points.length; i += 3) optimizedPoints.add(points[i]);
 
-      // 2. Читаем метки (waypoints)
+      // 3. Читаем метки (waypoints)
       final List<WaypointData> parsedWaypoints = [];
       final RegExp wptRegExp = RegExp(r'<wpt[^>]*lat="([^"]+)"[^>]*lon="([^"]+)">(.*?)</wpt>', dotAll: true);
 
@@ -49,11 +57,11 @@ class GpxParser {
         }
       }
 
-      print("✅ УСПЕХ! GPX загружен: $assetPath");
+      print("✅ УСПЕХ! GPX загружен из сети: $url");
       return ParsedGpx(trackPoints: optimizedPoints, waypoints: parsedWaypoints);
 
     } catch (e) {
-      print("❌ ОШИБКА GPX ($assetPath): $e");
+      print("❌ ОШИБКА GPX (Network): $e");
       return null;
     }
   }

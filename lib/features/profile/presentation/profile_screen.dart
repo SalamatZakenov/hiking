@@ -1,260 +1,212 @@
-// lib/features/profile/presentation/profile_screen.dart
-import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'track_detail_screen.dart';
 
+import '../../tracking/providers/tracking_provider.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../../core/theme/app_theme.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  List<Map<String, dynamic>> _completedRoutes = [];
-  bool _isLoading = true;
-  double _totalDistanceAllTime = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCompletedRoutes();
-  }
-
-  // --- Читаем сохраненные маршруты из памяти ---
-  Future<void> _loadCompletedRoutes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? savedData = prefs.getString('completed_routes');
-
-    if (savedData != null) {
-      final List<dynamic> decoded = jsonDecode(savedData);
-      double totalDist = 0;
-
-      final routes = decoded.map((e) {
-        final route = Map<String, dynamic>.from(e);
-        totalDist += (route['distanceKm'] as num).toDouble();
-        return route;
-      }).toList();
-
-      setState(() {
-        _completedRoutes = routes;
-        _totalDistanceAllTime = totalDist;
-      });
-    }
-    setState(() => _isLoading = false);
-  }
-
-  // Форматируем дату в красивый вид
-  String _formatDate(String isoString) {
-    try {
-      final date = DateTime.parse(isoString);
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${date.day} ${months[date.month - 1]}, ${date.year} • ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'Unknown date';
+  // --- МЕТОД ДЛЯ ВЫБОРА ИКОНКИ ---
+  IconData getIconForType(String type) {
+    switch(type) {
+      case 'Walking': return Icons.directions_walk_rounded;
+      case 'Running': return Icons.directions_run_rounded;
+      case 'Hiking': default: return Icons.terrain_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.user;
+    final tracker = Provider.of<TrackingProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: AppTheme.bgDark,
-        body: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // --- ШАПКА ПРОФИЛЯ ---
-            SliverToBoxAdapter(
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20),
-                  child: Column(
+    final tracks = tracker.savedTracks;
+
+    final int totalHikes = tracks.length;
+    final double totalDistance = tracks.fold(0.0, (sum, track) => sum + track.distanceKm);
+    final int totalElevation = 0;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        title: const Text('Profile', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: Colors.white),
+            onPressed: () {},
+          )
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- ШАПКА ---
+            Center(
+              child: Column(
+                children: [
+                  // НОВЫЙ КОД: Заглавная буква имени
+                  Container(
+                    width: 100, height: 100,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white24, width: 2),
+                      color: const Color(0xFF32D74B).withOpacity(0.2), // Полупрозрачный зеленый фон
+                    ),
+                    child: Text(
+                      (authProvider.user?.username ?? 'S').substring(0, 1).toUpperCase(),
+                      style: const TextStyle(
+                          fontSize: 40,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF32D74B) // Зеленый текст
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                      authProvider.user?.username ?? 'Salamat Zakenov',
+                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                      authProvider.user?.email ?? 'salamat@zakenov.com',
+                      style: const TextStyle(color: Colors.white54, fontSize: 16)
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // --- СТАТИСТИКА ---
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Profile', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
-                          IconButton(
-                            icon: const Icon(Icons.logout_rounded, color: Colors.white54),
-                            onPressed: () => authProvider.logout(), // Кнопка выхода!
-                          )
-                        ],
-                      ),
-                      const SizedBox(height: 30),
-
-                      // Аватарка и Имя
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.blueAccent.withOpacity(0.2),
-                        child: Text(
-                          user?.username.substring(0, 1).toUpperCase() ?? 'U',
-                          style: const TextStyle(fontSize: 40, color: Colors.blueAccent, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(user?.username ?? 'Hiker', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                      Text(user?.email ?? '', style: const TextStyle(color: Colors.white54, fontSize: 14)),
-
-                      const SizedBox(height: 30),
-
-                      // ГЛОБАЛЬНАЯ СТАТИСТИКА
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1C1C1E),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.white10),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildGlobalStat('HIKES', _completedRoutes.length.toString()),
-                            Container(width: 1, height: 40, color: Colors.white10),
-                            _buildGlobalStat('DISTANCE', '${_totalDistanceAllTime.toStringAsFixed(1)} km'),
-                          ],
-                        ),
-                      ),
+                      _buildStatItem(totalHikes.toString(), 'Activities'),
+                      _buildDivider(),
+                      _buildStatItem('${totalDistance.toStringAsFixed(1)} km', 'Distance'),
+                      _buildDivider(),
+                      _buildStatItem('$totalElevation m', 'Elevation'),
                     ],
                   ),
                 ),
               ),
             ),
+            const SizedBox(height: 32),
 
-            // --- ЗАГОЛОВОК СПИСКА ---
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(24, 30, 24, 16),
-                child: Text('Completed Routes', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-              ),
-            ),
+            // --- СПИСОК ТРЕНИРОВОК ---
+            const Text('My Routes', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
 
-            // --- СПИСОК МАРШРУТОВ (ИЗ ПАМЯТИ) ---
-            if (_isLoading)
-              const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator(color: Colors.blueAccent)))
-            else if (_completedRoutes.isEmpty)
-              SliverToBoxAdapter(
+            if (tracks.isEmpty)
+              Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(40.0),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(Icons.directions_walk_rounded, size: 64, color: Colors.white.withOpacity(0.1)),
-                        const SizedBox(height: 16),
-                        const Text('No hikes yet.', style: TextStyle(color: Colors.white54, fontSize: 16)),
-                        const Text('Go track your first adventure!', style: TextStyle(color: Colors.white38, fontSize: 14)),
-                      ],
-                    ),
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    children: [
+                      Icon(Icons.directions_walk_rounded, color: Colors.white.withOpacity(0.2), size: 64),
+                      const SizedBox(height: 16),
+                      const Text("You haven't recorded any activities yet.", style: TextStyle(color: Colors.white54), textAlign: TextAlign.center),
+                    ],
                   ),
                 ),
               )
             else
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final route = _completedRoutes[index];
-                    return _buildCompletedRouteCard(route);
-                  },
-                  childCount: _completedRoutes.length,
-                ),
-              ),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: tracks.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final track = tracks[index];
+                  final dateStr = "${track.date.day.toString().padLeft(2, '0')}.${track.date.month.toString().padLeft(2, '0')}.${track.date.year}";
+                  final durationMin = track.durationSeconds ~/ 60;
 
-            // Отступ под нижнюю панель навигации
-            const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TrackDetailScreen(track: track),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: const Color(0xFF32D74B).withOpacity(0.2), shape: BoxShape.circle),
+                            child: Icon(getIconForType(track.type), color: const Color(0xFF32D74B)),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(track.name, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 4),
+                                Text(dateStr, style: const TextStyle(color: Colors.white54, fontSize: 14)),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('${track.distanceKm.toStringAsFixed(2)} km', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text('$durationMin min', style: const TextStyle(color: Colors.white54, fontSize: 14)),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
           ],
         ),
       ),
     );
   }
 
-  // Виджет глобальной статистики
-  Widget _buildGlobalStat(String label, String value) {
+  Widget _buildStatItem(String value, String label) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 14)),
       ],
     );
   }
 
-  // Карточка одного пройденного маршрута
-  Widget _buildCompletedRouteCard(Map<String, dynamic> route) {
-    final double dist = (route['distanceKm'] as num).toDouble();
-
-    return Container(
-      margin: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                          route['name'] ?? 'Unknown Route',
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                          _formatDate(route['date']),
-                          style: const TextStyle(color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.w600)
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blueAccent.withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.check_circle_rounded, color: Colors.blueAccent, size: 24),
-                )
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                _buildRouteMiniStat(Icons.route_rounded, '${dist.toStringAsFixed(2)} km'),
-                const SizedBox(width: 24),
-                _buildRouteMiniStat(Icons.timer_outlined, route['durationStr'] ?? '00:00:00'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRouteMiniStat(IconData icon, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white54, size: 18),
-        const SizedBox(width: 6),
-        Text(value, style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
-      ],
-    );
+  Widget _buildDivider() {
+    return Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1));
   }
 }

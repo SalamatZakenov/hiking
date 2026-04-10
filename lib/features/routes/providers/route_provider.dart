@@ -17,6 +17,8 @@ class RouteProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+// lib/features/routes/providers/route_provider.dart
+
   Future<void> loadRoutes() async {
     _isLoading = true;
     _error = null;
@@ -25,30 +27,23 @@ class RouteProvider with ChangeNotifier {
     try {
       _routes = await _service.fetchRoutes();
 
-      // ПРОХОДИМСЯ ПО КАЖДОМУ И ИЩЕМ ЛОКАЛЬНЫЙ GPX ФАЙЛ
+      // ПРОХОДИМСЯ ПО ВСЕМ МАРШРУТАМ ИЗ БАЗЫ
       for (int i = 0; i < _routes.length; i++) {
-        String? localGpxPath;
 
-        // ИЩЕМ ПО АНГЛИЙСКОМУ ИМЕНИ ИЗ БАЗЫ!
-        final routeNameLower = _routes[i].name.toLowerCase();
+        // ПРОВЕРЯЕМ, ПРИСЛАЛ ЛИ БЭКЕНД ССЫЛКУ НА GPX
+        final gpxUrl = _routes[i].gpxUrl;
 
-        if (routeNameLower.contains('furmanova') || routeNameLower.contains('фурманов')) {
-          localGpxPath = 'assets/routes/furmanov.gpx';
-        } else if (routeNameLower.contains('panorama') || routeNameLower.contains('панорама')) {
-          localGpxPath = 'assets/routes/panorama.gpx';
-        }
-
-        // Если нашли файл - Вклеиваем его координаты
-        if (localGpxPath != null) {
-          final gpxData = await GpxParser.loadRoute(localGpxPath);
+        if (gpxUrl != null && gpxUrl.isNotEmpty) {
+          // Скачиваем трек из интернета!
+          final gpxData = await GpxParser.loadRouteFromNetwork(gpxUrl);
 
           if (gpxData != null && gpxData.trackPoints.isNotEmpty) {
             _routes[i] = _routes[i].copyWith(
-              latitude: gpxData.trackPoints.last.latitude,
+              latitude: gpxData.trackPoints.last.latitude,       // Центр - это финиш
               longitude: gpxData.trackPoints.last.longitude,
-              trailhead: gpxData.trackPoints.first,
-              trackPoints: gpxData.trackPoints,
-              waypoints: gpxData.waypoints,
+              trailhead: gpxData.trackPoints.first,              // Старт
+              trackPoints: gpxData.trackPoints,                  // Линия
+              waypoints: gpxData.waypoints,                      // Метки
             );
           }
         }
@@ -64,7 +59,6 @@ class RouteProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
   // ... (метод _calculateDistances оставляем без изменений)
   Future<void> _calculateDistances() async {
     try {

@@ -30,8 +30,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await widget.authProvider.login(
-        email: _emailController.text,
-        password: _passwordController.text,
+          _emailController.text.trim(),
+          _passwordController.text.trim()
       );
       // Если успешно, GoRouter сам перекинет нас на карту
     } catch (e) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert'; // <-- ДОБАВИЛИ ДЛЯ ПАРСИНГА JSON
 
 // Простая модель пользователя
 class User {
@@ -25,7 +26,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null; // Если пользователь не null — он авторизован
 
-  // --- НОВЫЙ МЕТОД: Проверка сохраненной сессии при старте ---
+  // --- Проверка сохраненной сессии при старте ---
   Future<void> checkAuthStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -37,73 +38,67 @@ class AuthProvider extends ChangeNotifier {
       _user = User(username: username, email: email);
       print('✅ Сессия восстановлена для: $email');
     } else {
-      _user = null;
+      print('ℹ️ Сессия не найдена. Нужен логин.');
     }
     notifyListeners();
   }
 
-  // --- НОВЫЙ МЕТОД: Выход из аккаунта ---
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-    await prefs.remove('user_email');
-    await prefs.remove('user_name');
-
-    _user = null;
-    notifyListeners();
-  }
-
-  // Метод РЕГИСТРАЦИИ
-  Future<bool> register({
-    required String username,
-    required String email,
-    required String password
-  }) async {
+  // Метод: Логин (вход)
+  Future<bool> login(String username, String password) async {
     _isLoading = true;
     notifyListeners();
 
     try {
       final response = await _dio.post(
-          '/api/auth/register',
-          data: {
-            'username': username,
-            'email': email,
-            'password': password,
-          });
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (e) {
-      print('❌ Register Error: $e');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Метод ЛОГИНА
-  Future<bool> login({required String email, required String password}) async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      final response = await _dio.post(
-          '/api/auth/login',
-          data: {
-            'email': email,
-            'password': password,
-          });
+        '/api/auth/login',
+        data: {
+          "email": username, // У тебя на бэкенде поле называется email
+          "password": password
+        },
+      );
 
       if (response.statusCode == 200) {
-        final token = response.data['token'];
-        print('✅ Успешный логин! Получен токен: $token');
+        // --- УМНЫЙ ПАРСИНГ ОТВЕТА БЭКЕНДА ---
+        String? token;
 
-        final String tempUsername = email.split('@')[0];
-        _user = User(username: tempUsername, email: email);
+        if (response.data is Map) {
+          // Если бэкенд отдал правильный словарь
+          token = response.data['token'] ?? response.data['accessToken'];
+        } else if (response.data is String) {
+          // Если бэкенд отдал строку
+          try {
+            // Пробуем расшифровать строку как JSON
+            final decoded = jsonDecode(response.data);
+            token = decoded['token'] ?? decoded['accessToken'];
+          } catch (_) {
+            // Если это не JSON, возможно бэкенд прислал сам токен голым текстом
+            token = response.data;
+          }
+        }
 
-        // --- СОХРАНЯЕМ В ПАМЯТЬ ТЕЛЕФОНА ---
+        if (token == null || token.isEmpty) {
+          print('❌ Токен не найден в ответе: ${response.data}');
+          return false;
+        }
+
+        // Вытаскиваем email из токена (или берем тот, что ввели)
+        String tempEmail = username;
+        String tempUsername = username.split('@')[0];
+
+        try {
+          Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
+          tempEmail = decodedToken['sub'] ?? tempEmail;
+          tempUsername = decodedToken['name'] ?? tempUsername;
+        } catch (e) {
+          print('⚠️ Не удалось расшифровать JWT токен: $e');
+        }
+
+        _user = User(username: tempUsername, email: tempEmail);
+
+        // Сохраняем в память телефона
         final prefs = await SharedPreferences.getInstance();
-        if (token != null) await prefs.setString('auth_token', token.toString());
-        await prefs.setString('user_email', email);
+        await prefs.setString('auth_token', token);
+        await prefs.setString('user_email', tempEmail);
         await prefs.setString('user_name', tempUsername);
 
         return true;
@@ -130,28 +125,94 @@ class AuthProvider extends ChangeNotifier {
     print('✅ Успешный вход через OAuth! Токен: $token');
 
     try {
-      // 1. Расшифровываем токен
       Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
-      print('👉 Данные внутри токена: $decodedToken');
-
-      // 2. Вытаскиваем email
       String realEmail = decodedToken['sub'] ?? 'google@user.com';
-
-      // 3. Вытаскиваем имя (пока берем кусок почты до собачки @)
       String realName = decodedToken['name'] ?? realEmail.split('@')[0];
 
-      // 4. Сохраняем реальные данные в провайдер
       _user = User(username: realName, email: realEmail);
 
-      // --- СОХРАНЯЕМ В ПАМЯТЬ ТЕЛЕФОНА ---
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
       await prefs.setString('user_email', realEmail);
       await prefs.setString('user_name', realName);
 
+      notifyListeners();
     } catch (e) {
-      print('❌ Ошибка при разборе OAuth токена: $e');
+      print('❌ Ошибка при обработке OAuth токена: $e');
     }
+  }
+
+  // Метод: Регистрация
+  Future<bool> register(String username, String email, String password) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _dio.post(
+        '/api/v1/auth/register',
+        data: {
+          "firstname": username,
+          "lastname": username,
+          "email": email,
+          "password": password,
+          "role": "USER"
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // --- УМНЫЙ ПАРСИНГ ОТВЕТА БЭКЕНДА ---
+        String? token;
+
+        if (response.data is Map) {
+          token = response.data['token'] ?? response.data['accessToken'];
+        } else if (response.data is String) {
+          try {
+            final decoded = jsonDecode(response.data);
+            token = decoded['token'] ?? decoded['accessToken'];
+          } catch (_) {
+            token = response.data;
+          }
+        }
+
+        if (token == null || token.isEmpty) {
+          print('❌ Токен не найден при регистрации: ${response.data}');
+          return false;
+        }
+
+        _user = User(username: username, email: email);
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+        await prefs.setString('user_email', email);
+        await prefs.setString('user_name', username);
+
+        return true;
+      }
+      return false;
+
+    } on DioException catch (e) {
+      print('❌ Ошибка сети при регистрации: ${e.message}');
+      if (e.response != null) {
+        print('👉 Сервер жалуется на: ${e.response?.data}');
+      }
+      return false;
+    } catch (e) {
+      print('❌ Какая-то другая ошибка: $e');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Метод: Выход (Logout)
+  Future<void> logout() async {
+    _user = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('user_email');
+    await prefs.remove('user_name');
+    print('🚪 Пользователь вышел из системы. Память очищена.');
     notifyListeners();
   }
 }
