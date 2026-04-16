@@ -1,87 +1,95 @@
-// lib/features/routes/providers/route_provider.dart
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:latlong2/latlong.dart';
 import '../data/models/route_model.dart';
-import '../data/services/route_service.dart';
-import '../utils/gpx_parser.dart'; // Наш парсер
 
-class RouteProvider with ChangeNotifier {
-  final RouteService _service = RouteService();
-
+class RouteProvider extends ChangeNotifier {
   List<RouteModel> _routes = [];
   bool _isLoading = false;
-  String? _error;
+  String _searchQuery = '';
+  String _selectedCategory = 'ALL';
 
-  List<RouteModel> get routes => _routes;
   bool get isLoading => _isLoading;
-  String? get error => _error;
+  String get selectedCategory => _selectedCategory;
+  List<RouteModel> get routes => _routes;
 
-// lib/features/routes/providers/route_provider.dart
+  List<String> get categories {
+    final cats = _routes.map((r) => r.category.toUpperCase()).toSet().toList();
+    cats.insert(0, 'ALL');
+    return cats;
+  }
 
-  Future<void> loadRoutes() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  List<RouteModel> get filteredRoutes {
+    return _routes.where((route) {
+      final matchesCategory = _selectedCategory == 'ALL' || route.category.toUpperCase() == _selectedCategory;
+      final matchesSearch = route.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          route.location.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    }).toList();
+  }
+
+  // --- ГЛАВНЫЙ МЕТОД ДЛЯ ЗАГРУЗКИ ТОЧЕК ---
+  Future<void> loadGpxForRoute(String routeId) async {
+    final index = _routes.indexWhere((r) => r.id == routeId);
+    if (index == -1) return;
+
+    final route = _routes[index];
+
+    // Если точки уже загружены — не качаем заново
+    if (route.cachedGpxPoints != null && route.cachedGpxPoints!.isNotEmpty) return;
+    if (route.gpxUrl == null || route.gpxUrl!.isEmpty) return;
 
     try {
-      _routes = await _service.fetchRoutes();
+      final response = await Dio().get(route.gpxUrl!);
+      final xmlString = response.data.toString();
 
-      // ПРОХОДИМСЯ ПО ВСЕМ МАРШРУТАМ ИЗ БАЗЫ
-      for (int i = 0; i < _routes.length; i++) {
+      // Парсим координаты из XML
+      final RegExp regExp = RegExp(r'<trkpt lat="([-+]?[\d.]+)" lon="([-+]?[\d.]+)"');
+      final matches = regExp.allMatches(xmlString);
 
-        // ПРОВЕРЯЕМ, ПРИСЛАЛ ЛИ БЭКЕНД ССЫЛКУ НА GPX
-        final gpxUrl = _routes[i].gpxUrl;
-
-        if (gpxUrl != null && gpxUrl.isNotEmpty) {
-          // Скачиваем трек из интернета!
-          final gpxData = await GpxParser.loadRouteFromNetwork(gpxUrl);
-
-          if (gpxData != null && gpxData.trackPoints.isNotEmpty) {
-            _routes[i] = _routes[i].copyWith(
-              latitude: gpxData.trackPoints.last.latitude,       // Центр - это финиш
-              longitude: gpxData.trackPoints.last.longitude,
-              trailhead: gpxData.trackPoints.first,              // Старт
-              trackPoints: gpxData.trackPoints,                  // Линия
-              waypoints: gpxData.waypoints,                      // Метки
-            );
-          }
-        }
+      List<LatLng> points = [];
+      for (var m in matches) {
+        double lat = double.parse(m.group(1)!);
+        double lon = double.parse(m.group(2)!);
+        if (lat != 0 && lon != 0) points.add(LatLng(lat, lon));
       }
 
-      debugPrint('✅ Успешно спарсили и склеили маршрутов: ${_routes.length}');
-      await _calculateDistances();
+      if (points.isNotEmpty) {
+        // Обновляем маршрут в списке, добавляя ему скачанные точки
+        _routes[index] = route.copyWith(cachedGpxPoints: points);
+        notifyListeners(); // Карта увидит изменения и нарисует линию
+      }
     } catch (e) {
-      debugPrint('❌ ОШИБКА В PROVIDER: $e');
-      _error = e.toString();
+      print('Ошибка загрузки GPX в провайдере: $e');
+    }
+  }
+
+  Future<void> fetchRoutes() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final response = await Dio().get(
+        'https://shyn-api.site/api/routes',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        _routes = data.map((json) => RouteModel.fromJson(json)).toList();
+      }
+    } catch (e) {
+      print('Ошибка загрузки: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
-  // ... (метод _calculateDistances оставляем без изменений)
-  Future<void> _calculateDistances() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      final userLatLng = LatLng(position.latitude, position.longitude);
-      final distanceCalc = const Distance();
-
-      for (var route in _routes) {
-        final routeLatLng = LatLng(route.latitude, route.longitude);
-        final meters = distanceCalc.distance(userLatLng, routeLatLng);
-        route.calculatedDistance = meters / 1000;
-      }
-    } catch (e) {
-      debugPrint('❌ Ошибка при расчете дистанции: $e');
-    }
+  void searchRoutes(String query) { _searchQuery = query; notifyListeners(); }
+  void selectCategory(String category) { _selectedCategory = category; notifyListeners(); }
+  RouteModel? findById(String id) {
+    try { return _routes.firstWhere((r) => r.id == id); } catch (e) { return null; }
   }
 }

@@ -39,7 +39,7 @@ void main() async {
           value: locator<TrackingProvider>(),
         ),
         ChangeNotifierProvider(
-          create: (_) => RouteProvider()..loadRoutes(),
+          create: (_) => RouteProvider()..fetchRoutes(),
         ),
       ],
       child: const HikingApp(),

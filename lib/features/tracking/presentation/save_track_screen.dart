@@ -13,14 +13,27 @@ class SaveTrackScreen extends StatefulWidget {
 
 class _SaveTrackScreenState extends State<SaveTrackScreen> {
   final TextEditingController _nameController = TextEditingController();
-  String _selectedType = 'Hiking'; // По умолчанию
+  String _selectedType = 'Hiking';
   final List<String> _activityTypes = ['Walking', 'Running', 'Hiking'];
+
+  // Список добавленных фото (пока храним ссылки для тестов)
+  final List<String> _attachedPhotos = [];
 
   @override
   void initState() {
     super.initState();
-    // Генерируем дефолтное название
-    _nameController.text = 'Morning ${_selectedType}';
+    _nameController.text = 'Morning $_selectedType';
+  }
+
+  void _addMockPhoto() {
+    final mockImages = [
+      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&fit=crop',
+      'https://images.unsplash.com/photo-1551632811-561732d1e306?w=600&fit=crop',
+      'https://images.unsplash.com/photo-1522163182402-834f871fd851?w=600&fit=crop',
+    ];
+    setState(() {
+      _attachedPhotos.add(mockImages[_attachedPhotos.length % mockImages.length]);
+    });
   }
 
   @override
@@ -28,8 +41,11 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
     final tracker = Provider.of<TrackingProvider>(context, listen: false);
     final points = tracker.routePoints;
 
-    // Центрируем карту по последней точке или центру маршрута
-    final mapCenter = points.isNotEmpty ? points[points.length ~/ 2] : const LatLng(43.2220, 76.8512);
+    // Вычисляем границы для идеального фокуса на маршруте
+    LatLngBounds? bounds;
+    if (points.length > 1) {
+      bounds = LatLngBounds.fromPoints(points);
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -40,16 +56,13 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () {
-            // Если передумал сохранять — возвращаемся и продолжаем (или можно сделать сброс)
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // --- КАРТА С МАРШРУТОМ ---
+            // --- КАРТА ---
             SizedBox(
               height: 250,
               width: double.infinity,
@@ -57,40 +70,35 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                 borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
                 child: FlutterMap(
                   options: MapOptions(
-                    initialCenter: mapCenter,
-                    initialZoom: 14.0,
-                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.none), // Запрещаем крутить карту, она чисто для красоты
+                    // Идеальный зум (с отступами 20 и максимальным приближением 17.0)
+                    initialCameraFit: bounds != null ? CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(20), maxZoom: 17.0) : null,
+                    initialCenter: bounds == null && points.isNotEmpty ? points.first : const LatLng(43.2220, 76.8512),
+                    initialZoom: 16.0,
+                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.none), // Тут карта статична
                   ),
                   children: [
                     TileLayer(
                       urlTemplate: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
                       subdomains: const ['a', 'b', 'c'],
-
                       userAgentPackageName: 'com.salamat.hiking_app',
-                      maxNativeZoom: 17,
-                      maxZoom: 22,
                     ),
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: points,
-                          color: Colors.blueAccent,
-                          strokeWidth: 5.0,
-                        ),
-                      ],
-                    ),
-                    // Добавляем маркеры Старта и Финиша
+
+                    // --- ДОБАВЛЕНА ПРОВЕРКА ВОТ ТУТ ---
+                    if (points.isNotEmpty)
+                      PolylineLayer(
+                        polylines: [
+                          Polyline(
+                            points: points, color: const Color(0xFF007AFF), strokeWidth: 6.0,
+                            strokeCap: StrokeCap.round, strokeJoin: StrokeJoin.round,
+                          ),
+                        ],
+                      ),
+
                     if (points.isNotEmpty)
                       MarkerLayer(
                         markers: [
-                          Marker(
-                            point: points.first, // Старт
-                            child: const Icon(Icons.location_on, color: Colors.green, size: 30),
-                          ),
-                          Marker(
-                            point: points.last, // Финиш
-                            child: const Icon(Icons.flag_circle, color: Colors.red, size: 30),
-                          ),
+                          Marker(point: points.first, child: const Icon(Icons.location_on, color: Color(0xFF32D74B), size: 30)),
+                          Marker(point: points.last, child: const Icon(Icons.flag_circle, color: Colors.red, size: 30)),
                         ],
                       ),
                   ],
@@ -103,7 +111,6 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- СТАТИСТИКА ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -113,21 +120,18 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                   ),
                   const SizedBox(height: 30),
 
-                  // --- НАЗВАНИЕ ---
                   const Text('Activity Name', style: TextStyle(color: Colors.white54, fontSize: 14)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _nameController,
                     style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                     decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
+                      filled: true, fillColor: Colors.white.withOpacity(0.1),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
                     ),
                   ),
                   const SizedBox(height: 30),
 
-                  // --- ТИП АКТИВНОСТИ ---
                   const Text('Activity Type', style: TextStyle(color: Colors.white54, fontSize: 14)),
                   const SizedBox(height: 12),
                   Row(
@@ -135,12 +139,7 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                     children: _activityTypes.map((type) {
                       final isSelected = _selectedType == type;
                       return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedType = type;
-                            _nameController.text = 'Morning $type'; // Автоматически меняем название
-                          });
-                        },
+                        onTap: () => setState(() { _selectedType = type; _nameController.text = 'Morning $type'; }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -148,44 +147,75 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                             color: isSelected ? const Color(0xFF32D74B) : Colors.white.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Text(
-                            type,
-                            style: TextStyle(
-                              color: isSelected ? Colors.black : Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: Text(type, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
                         ),
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 50),
+                  const SizedBox(height: 30),
 
-                  // --- КНОПКА СОХРАНИТЬ ---
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF32D74B),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  // --- ФОТОГРАФИИ ---
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _addMockPhoto,
+                        child: Container(
+                          width: 80, height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: Colors.white24, style: BorderStyle.solid),
+                          ),
+                          child: const Icon(Icons.add_a_photo_rounded, color: Colors.white54, size: 30),
+                        ),
                       ),
-                      onPressed: () async {
-                        // 1. Сохраняем в провайдер!
-                        await tracker.saveCurrentTrack(
-                          name: _nameController.text.trim(),
-                          type: _selectedType,
-                        );
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: 80,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _attachedPhotos.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(15),
+                                  child: Image.network(_attachedPhotos[index], width: 80, height: 80, fit: BoxFit.cover),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 40),
 
-                        // 2. Закрываем экран сохранения и возвращаемся
-                        if (mounted) {
-                          Navigator.pop(context); // Закрыть экран
-                          // Опционально: показать SnackBar об успехе
-                        }
+                  // --- КНОПКИ ---
+                  SizedBox(
+                    width: double.infinity, height: 55,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF32D74B), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                      onPressed: () async {
+                        await tracker.saveCurrentTrack(name: _nameController.text.trim(), type: _selectedType, imageUrls: _attachedPhotos);
+                        if (mounted) Navigator.pop(context);
                       },
                       child: const Text('Save Activity', style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
-                  )
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity, height: 55,
+                    child: TextButton(
+                      style: TextButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                      onPressed: () async {
+                        await tracker.discardCurrentTrack();
+                        if (mounted) Navigator.pop(context);
+                      },
+                      child: const Text('Discard Activity', style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
                 ],
               ),
             )

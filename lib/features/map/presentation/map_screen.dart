@@ -237,6 +237,25 @@ class _MapScreenState extends State<MapScreen> {
     final tracker = Provider.of<TrackingProvider>(context);
     final routeProvider = Provider.of<RouteProvider>(context);
 
+    if (widget.targetPeakName != null && _selectedRoute == null && !routeProvider.isLoading) {
+      try {
+        final target = routeProvider.routes.firstWhere(
+                (r) => r.name.toLowerCase() == widget.targetPeakName!.toLowerCase()
+        );
+
+        // Используем Future.microtask чтобы не вызывать setState во время build
+        Future.microtask(() {
+          setState(() {
+            _selectedRoute = target;
+            // Перемещаем камеру к началу маршрута
+            _mapController.move(LatLng(target.latitude, target.longitude), 14.0);
+          });
+        });
+      } catch (e) {
+        print("Маршрут ${widget.targetPeakName} не найден в списке");
+      }
+    }
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
@@ -628,7 +647,13 @@ class _MapScreenState extends State<MapScreen> {
           if (_pathToPeak.isNotEmpty)
             PolylineLayer(
               polylines: [
-                Polyline(points: _pathToPeak, strokeWidth: 4.0, color: Colors.lightBlueAccent.withOpacity(0.9), borderStrokeWidth: 1.5, borderColor: Colors.blue[900]!)
+                Polyline(
+                    points: _pathToPeak,
+                    strokeWidth: 4.0,
+                    color: Colors.lightBlueAccent.withOpacity(0.9),
+                    borderStrokeWidth: 1.5,
+                    borderColor: Colors.blue[900]!
+                )
               ],
             ),
 
@@ -642,7 +667,19 @@ class _MapScreenState extends State<MapScreen> {
 
           // 3. ТВОЙ ТЕКУЩИЙ МАРШРУТ ЗАПИСИ (Синий)
           if (tracker.routePoints.isNotEmpty)
-            PolylineLayer(polylines: [Polyline(points: tracker.routePoints, strokeWidth: 6.0, color: _userBlue, borderStrokeWidth: 1.5, borderColor: Colors.white)]),
+            PolylineLayer(
+                polylines: [
+                  Polyline(
+                      points: tracker.routePoints,
+                      strokeWidth: 6.0,
+                      strokeCap: StrokeCap.round,
+                      strokeJoin: StrokeJoin.round,
+                      color: _userBlue,
+                      borderStrokeWidth: 1.5,
+                      borderColor: Colors.white
+                  )
+                ]
+            ),
 
           MarkerLayer(
             markers: [

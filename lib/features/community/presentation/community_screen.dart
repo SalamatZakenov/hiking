@@ -1,8 +1,14 @@
-// lib/features/community/presentation/community_screen.dart
-import 'dart:ui';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
+import 'comments_sheet.dart';
+
+import '../../tracking/providers/tracking_provider.dart';
+import '../../tracking/data/models/local_track.dart';
+import '../../profile/presentation/track_detail_screen.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -12,288 +18,227 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen> {
-  // Фейковые данные для статусов/историй
-  final List<Map<String, String>> _stories = [
-    {'name': 'Arman', 'image': 'https://i.pravatar.cc/150?img=11'},
-    {'name': 'Madina', 'image': 'https://i.pravatar.cc/150?img=5'},
-    {'name': 'Sergey', 'image': 'https://i.pravatar.cc/150?img=60'},
-    {'name': 'Aruzhan', 'image': 'https://i.pravatar.cc/150?img=44'},
-    {'name': 'Denis', 'image': 'https://i.pravatar.cc/150?img=50'},
-  ];
-
-  // Фейковые данные для ленты
-  final List<Map<String, dynamic>> _posts = [
-    {
-      'userName': 'Arman',
-      'userImage': 'https://i.pravatar.cc/150?img=11',
-      'location': 'Пик Нурсултан',
-      'timeAgo': '2 hours ago',
-      'postImage': 'https://images.unsplash.com/photo-1522163182402-834f871fd851?auto=format&fit=crop&w=1000&q=80',
-      'caption': 'It was a tough climb, but the view from the top is absolutely worth every step! 🏔️✨',
-      'distance': '12.4 km',
-      'elevation': '1,450 m',
-      'likes': 142,
-      'comments': 18,
-    },
-    {
-      'userName': 'Madina',
-      'userImage': 'https://i.pravatar.cc/150?img=5',
-      'location': 'Кок-Жайляу',
-      'timeAgo': '5 hours ago',
-      'postImage': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1000&q=80',
-      'caption': 'Easy sunday hike with friends. The weather was perfect! ☀️🌲',
-      'distance': '8.2 km',
-      'elevation': '600 m',
-      'likes': 89,
-      'comments': 4,
-    },
-  ];
-
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: AppTheme.bgDark,
-        appBar: AppBar(
-          backgroundColor: AppTheme.bgDark,
-          elevation: 0,
-          title: const Text('Community', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          centerTitle: false,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.search_rounded, color: Colors.white),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.add_box_outlined, color: Colors.white),
-              onPressed: () {},
-            ),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: RefreshIndicator(
-          color: Colors.blueAccent,
-          backgroundColor: const Color(0xFF1E1E1E),
-          onRefresh: () async {
-            await Future.delayed(const Duration(seconds: 1)); // Имитация загрузки
-          },
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            slivers: [
-              // --- БЛОК ИСТОРИЙ (СТАТУСОВ) ---
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 110,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _stories.length + 1, // +1 для кнопки "Мой статус"
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return _buildAddStoryBtn();
-                      }
-                      final story = _stories[index - 1];
-                      return _buildStoryItem(story['name']!, story['image']!);
-                    },
-                  ),
-                ),
-              ),
+    final tracker = Provider.of<TrackingProvider>(context);
+    final posts = tracker.communityTracks;
 
-              // Разделитель
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Divider(color: Colors.white.withOpacity(0.05), thickness: 1),
-                ),
-              ),
-
-              // --- ЛЕНТА ПОСТОВ ---
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final post = _posts[index];
-                    return _buildPostCard(post);
-                  },
-                  childCount: _posts.length,
-                ),
-              ),
-
-              // Отступ снизу для нижней панели навигации
-              const SliverToBoxAdapter(child: SizedBox(height: 100)),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('Community', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => tracker.fetchCommunityPosts(),
+        child: posts.isEmpty
+            ? const Center(child: Text("No posts yet. Start hiking!", style: TextStyle(color: Colors.white54)))
+            : ListView.builder(
+          itemCount: posts.length,
+          itemBuilder: (context, index) => _buildFeedPost(context, posts[index]),
         ),
       ),
     );
   }
 
-  // --- КОМПОНЕНТ: КНОПКА "ДОБАВИТЬ СТАТУС" ---
-  Widget _buildAddStoryBtn() {
-    return Padding(
-      padding: const EdgeInsets.only(right: 16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Stack(
-            children: [
-              Container(
-                width: 70, height: 70,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF2C2C2E),
-                  border: Border.all(color: Colors.white10, width: 2),
-                ),
-                child: ClipOval(
-                  child: Image.network('https://i.pravatar.cc/150?img=32', fit: BoxFit.cover),
-                ),
-              ),
-              Positioned(
-                bottom: 0, right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
-                  child: const Icon(Icons.add, color: Colors.white, size: 16),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text('Your Story', style: TextStyle(color: Colors.white70, fontSize: 12)),
-        ],
-      ),
-    );
-  }
+  Widget _buildFeedPost(BuildContext context, LocalTrack track) {
+    final dateStr = "${track.date.day.toString().padLeft(2, '0')}.${track.date.month.toString().padLeft(2, '0')}.${track.date.year}";
+    final String realUserName = track.username.isNotEmpty ? track.username : 'User';
 
-  // --- КОМПОНЕНТ: ИСТОРИЯ ДРУГА ---
-  Widget _buildStoryItem(String name, String imageUrl) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 70, height: 70,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF32D74B), Colors.blueAccent],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Container(
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppTheme.bgDark),
-              padding: const EdgeInsets.all(2),
-              child: ClipOval(
-                child: Image.network(imageUrl, fit: BoxFit.cover),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(name, style: const TextStyle(color: Colors.white, fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  // --- КОМПОНЕНТ: КАРТОЧКА ПОСТА ---
-  Widget _buildPostCard(Map<String, dynamic> post) {
     return Container(
-      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        color: Colors.white.withOpacity(0.02),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05)), bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Шапка поста (Аватар + Имя + Локация)
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                CircleAvatar(backgroundImage: NetworkImage(post['userImage']), radius: 20),
+                CircleAvatar(
+                    backgroundColor: const Color(0xFF32D74B).withOpacity(0.2),
+                    child: Text(realUserName[0].toUpperCase(), style: const TextStyle(color: Color(0xFF32D74B), fontWeight: FontWeight.bold))
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(post['userName'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text(post['location'], style: const TextStyle(color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.w500)),
+                      Text(realUserName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('$dateStr • ${track.activityType}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
                     ],
                   ),
                 ),
-                IconButton(icon: const Icon(Icons.more_horiz, color: Colors.white54), onPressed: () {}),
               ],
             ),
           ),
-
-          // Фотография поста
-          Image.network(
-            post['postImage'],
-            width: double.infinity,
-            height: 300,
-            fit: BoxFit.cover,
-          ),
-
-          // Спортивная статистика (Дистанция / Высота)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            decoration: BoxDecoration(color: Colors.black.withOpacity(0.2)),
-            child: Row(
-              children: [
-                const Icon(Icons.route_outlined, color: Colors.white70, size: 20),
-                const SizedBox(width: 6),
-                Text(post['distance'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 24),
-                const Icon(Icons.height_rounded, color: Colors.white70, size: 20),
-                const SizedBox(width: 6),
-                Text(post['elevation'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-
-          // Кнопки лайков/комментариев
+          const SizedBox(height: 16),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(track.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 16),
+          _PostCarousel(track: track),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                const Icon(Icons.favorite_border_rounded, color: Colors.white, size: 28),
+                GestureDetector(
+                  onTap: () => Provider.of<TrackingProvider>(context, listen: false).toggleLike(track.id),
+                  child: Icon(
+                      track.likedByMe ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                      color: track.likedByMe ? Colors.redAccent : Colors.white, size: 28),
+                ),
                 const SizedBox(width: 8),
-                Text('${post['likes']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                Text('${track.likeCount}', style: const TextStyle(color: Colors.white, fontSize: 14)),
                 const SizedBox(width: 24),
-                const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 26),
+                GestureDetector(
+                  onTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => CommentsSheet(trackId: track.id),
+                    );
+                  },
+                  child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 26),
+                ),
                 const SizedBox(width: 8),
-                Text('${post['comments']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                Text('${track.commentCount}', style: const TextStyle(color: Colors.white, fontSize: 14)),
                 const Spacer(),
-                const Icon(Icons.bookmark_border_rounded, color: Colors.white, size: 28),
+                if (track.imageUrls.isNotEmpty)
+                  const Icon(Icons.photo_library_outlined, color: Colors.white54, size: 20),
               ],
             ),
-          ),
-
-          // Текст поста
-          Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
-            child: RichText(
-              text: TextSpan(
-                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
-                children: [
-                  TextSpan(text: '${post['userName']} ', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  TextSpan(text: post['caption']),
-                ],
-              ),
-            ),
-          ),
-
-          // Время назад
-          Padding(
-            padding: const EdgeInsets.only(left: 16, bottom: 20),
-            child: Text(post['timeAgo'], style: const TextStyle(color: Colors.white38, fontSize: 12)),
           )
+        ],
+      ),
+    );
+  }
+}
+
+class _PostCarousel extends StatefulWidget {
+  final LocalTrack track;
+  const _PostCarousel({required this.track});
+  @override
+  State<_PostCarousel> createState() => _PostCarouselState();
+}
+
+class _PostCarouselState extends State<_PostCarousel> {
+  int _currentIndex = 0;
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TrackDetailScreen(track: widget.track))),
+          child: _FeedMapWidget(track: widget.track)
+      ),
+      ...widget.track.imageUrls.map((url) => Image.network(url, fit: BoxFit.cover))
+    ];
+
+    return SizedBox(
+      height: 300,
+      child: Stack(
+        children: [
+          PageView(
+            onPageChanged: (i) => setState(() => _currentIndex = i),
+            children: pages,
+          ),
+          if (pages.length > 1)
+            Positioned(
+              bottom: 10, left: 0, right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(pages.length, (i) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: _currentIndex == i ? 12 : 6, height: 6,
+                  decoration: BoxDecoration(color: _currentIndex == i ? const Color(0xFF32D74B) : Colors.white54, borderRadius: BorderRadius.circular(3)),
+                )),
+              ),
+            )
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedMapWidget extends StatefulWidget {
+  final LocalTrack track;
+  const _FeedMapWidget({required this.track});
+  @override
+  State<_FeedMapWidget> createState() => _FeedMapWidgetState();
+}
+
+class _FeedMapWidgetState extends State<_FeedMapWidget> {
+  List<LatLng> points = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      String xmlString = "";
+      if (widget.track.gpxFilePath.startsWith('http')) {
+        final response = await Dio().get(widget.track.gpxFilePath);
+        xmlString = response.data.toString();
+      } else {
+        final file = File(widget.track.gpxFilePath);
+        if (await file.exists()) {
+          xmlString = await file.readAsString();
+        }
+      }
+
+      if (xmlString.isNotEmpty) {
+        final RegExp regExp = RegExp(r'<trkpt lat="([^"]+)" lon="([^"]+)".*?>');
+        final matches = regExp.allMatches(xmlString);
+        if (mounted) {
+          setState(() {
+            points = matches.map((m) => LatLng(double.parse(m.group(1)!), double.parse(m.group(2)!))).toList();
+          });
+        }
+      }
+    } catch (e) {
+      print('Ошибка загрузки GPX в сообществе: $e');
+    }
+  }
+
+  Widget _buildMapMarker(Color color, IconData icon) {
+    return Container(
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+      child: Icon(icon, color: Colors.white, size: 15),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (points.isEmpty) return Container(color: Colors.white.withOpacity(0.05), child: const Center(child: CircularProgressIndicator(color: Color(0xFF32D74B))));
+
+    LatLngBounds? bounds;
+    if (points.length > 1) bounds = LatLngBounds.fromPoints(points);
+
+    return AbsorbPointer(
+      child: FlutterMap(
+        options: MapOptions(
+          initialCameraFit: bounds != null ? CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(20), maxZoom: 16) : null,
+          initialCenter: bounds == null && points.isNotEmpty ? points.first : const LatLng(43.2220, 76.8512),
+        ),
+        children: [
+          TileLayer(urlTemplate: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', subdomains: const ['a','b','c'], userAgentPackageName: 'com.salamat.hiking_app'),
+          if (points.isNotEmpty)
+            PolylineLayer(polylines: [Polyline(points: points, color: const Color(0xFF007AFF), strokeWidth: 5, strokeCap: StrokeCap.round, strokeJoin: StrokeJoin.round)]),
+          if (points.isNotEmpty)
+            MarkerLayer(markers: [
+              Marker(point: points.first, width: 30, height: 30, child: _buildMapMarker(const Color(0xFF32D74B), Icons.play_arrow_rounded)),
+              Marker(point: points.last, width: 30, height: 30, child: _buildMapMarker(Colors.redAccent, Icons.flag_rounded)),
+            ]),
         ],
       ),
     );
