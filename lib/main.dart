@@ -1,5 +1,6 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import 'core/di/locator.dart';
@@ -13,6 +14,11 @@ import 'features/tracking/providers/tracking_provider.dart';
 void main() async {
   // Обязательно вызываем это первыми
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Инициализируем локальную базу данных
+  await Hive.initFlutter();
+  await Hive.openBox('routesBox'); // Тут будем хранить JSON маршрутов
+  await Hive.openBox('gpxBox');    // Тут будем хранить координаты GPX
 
   // Инициализируем locator (твои зависимости)
   setupLocator();

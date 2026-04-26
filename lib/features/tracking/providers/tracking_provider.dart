@@ -47,14 +47,24 @@ class TrackingProvider extends ChangeNotifier {
     fetchCommunityPosts();
   }
 
-  // --- 1. ЗАГРУЗКА МОИХ ТРЕКОВ (PROFILE) ---
+// --- 1. ЗАГРУЗКА МОИХ ТРЕКОВ (PROFILE) ---
   Future<void> loadSavedTracks() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      if (token == null) return;
 
-      final response = await Dio().get(
+      if (token == null) {
+        print('⚠️ Токен не найден! Залогиньтесь, чтобы увидеть свои треки.');
+        return;
+      }
+
+      // Добавили быстрый тайм-аут (3 секунды)
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 3),
+      ));
+
+      final response = await dio.get(
         'https://shyn-api.site/api/routes/user-tracks/my',
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
@@ -64,9 +74,10 @@ class TrackingProvider extends ChangeNotifier {
         _savedTracks = data.map((json) => LocalTrack.fromMap(json)).toList();
         _savedTracks.sort((a, b) => b.date.compareTo(a.date));
         notifyListeners();
+        print('✅ Мои треки успешно загружены!');
       }
     } catch (e) {
-      print('Ошибка загрузки моих треков: $e');
+      print('❌ Ошибка загрузки моих треков: $e');
     }
   }
 
@@ -75,10 +86,19 @@ class TrackingProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      if (token == null) return;
 
-      final response = await Dio().get(
-        'https://shyn-api.site/api/routes/user-tracks/feed', // Правильный эндпоинт ленты
+      if (token == null) {
+        print('⚠️ Токен не найден! Залогиньтесь, чтобы увидеть ленту.');
+        return;
+      }
+
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 3),
+      ));
+
+      final response = await dio.get(
+        'https://shyn-api.site/api/routes/user-tracks/feed',
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
@@ -86,9 +106,10 @@ class TrackingProvider extends ChangeNotifier {
         final List<dynamic> data = response.data;
         _communityTracks = data.map((json) => LocalTrack.fromMap(json)).toList();
         notifyListeners();
+        print('✅ Лента комьюнити успешно загружена!');
       }
     } catch (e) {
-      print('Ошибка загрузки ленты: $e');
+      print('❌ Ошибка загрузки ленты: $e');
     }
   }
 

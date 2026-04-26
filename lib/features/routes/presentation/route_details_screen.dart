@@ -6,9 +6,11 @@ import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../providers/route_provider.dart';
 import '../data/models/route_model.dart';
+import '../../map/presentation/map_screen.dart';
 
 class RouteDetailsScreen extends StatefulWidget {
   final String routeId;
@@ -27,7 +29,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
   String _weatherText = '...';
   bool _isWeatherFetched = false;
 
-  // Данные карты
   List<LatLng> _points = [];
   bool _isLoadingMap = false;
   bool _mapError = false;
@@ -63,7 +64,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
       final xmlString = response.data.toString();
 
       if (xmlString.isNotEmpty) {
-        // Ищем координаты строго внутри тегов <trkpt ... >
         final RegExp regExp = RegExp(r'<trkpt lat="([-+]?[\d.]+)" lon="([-+]?[\d.]+)"');
         final matches = regExp.allMatches(xmlString);
 
@@ -72,7 +72,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
           double lat = double.parse(m.group(1)!);
           double lon = double.parse(m.group(2)!);
 
-          // Фильтруем битые координаты (0.0, 0.0), которые создают лишние линии
           if (lat != 0 && lon != 0) {
             parsedPoints.add(LatLng(lat, lon));
           }
@@ -157,6 +156,19 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                             )
                           ],
                         ),
+
+                        // --- ИНДИКАТОР ОФЛАЙН РЕЖИМА ---
+                        if (routeProvider.isRegionDownloaded) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.offline_pin_rounded, color: Color(0xFF32D74B), size: 16),
+                              const SizedBox(width: 4),
+                              Text('Available Offline', style: TextStyle(color: const Color(0xFF32D74B).withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ],
+
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -183,13 +195,16 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                         ),
                         const SizedBox(height: 40),
 
-                        // --- МИНИ-КАРТА (СТАТИЧНАЯ И КЛИКАБЕЛЬНАЯ) ---
                         const Text('Route Map', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
                         GestureDetector(
                           onTap: () {
-                            // При нажатии переходим на основную карту и передаем название пика
-                            context.push('/map?targetPeakName=${route.name}');
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => MapScreen(targetPeakName: route.name),
+                              ),
+                            );
                           },
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(24),
@@ -213,7 +228,8 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                 ),
               ],
             ),
-            // Кнопки Назад/Bookmark
+
+            // --- КНОПКИ ВЕРХНЕЙ ПАНЕЛИ ---
             Positioned(
               top: MediaQuery.of(context).padding.top + 10,
               left: 16, right: 16,
@@ -263,7 +279,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
     );
   }
 
-  // Логика отрисовки карты: теперь без Spinner
   Widget _buildMapContent(LatLngBounds? bounds) {
     if (_mapError || _points.isEmpty) {
       return const Column(
@@ -275,14 +290,19 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
         ],
       );
     }
-    return AbsorbPointer( // Делаем карту нечувствительной к жестам внутри контейнера
+    return AbsorbPointer(
       child: FlutterMap(
         options: MapOptions(
           initialCameraFit: bounds != null ? CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(20), maxZoom: 16) : null,
-          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none), // Фиксируем карту
+          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
         ),
         children: [
-          TileLayer(urlTemplate: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', subdomains: const ['a', 'b', 'c'], userAgentPackageName: 'com.salamat.hiking_app'),
+          TileLayer(
+            urlTemplate: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+            subdomains: const ['a', 'b', 'c'],
+            userAgentPackageName: 'com.salamat.hiking_app',
+            tileProvider: CachedTileProvider(), // <--- ИСПОЛЬЗУЕМ ОФЛАЙН КЭШ НА МИНИ КАРТЕ
+          ),
           PolylineLayer(polylines: [Polyline(points: _points, color: const Color(0xFF007AFF), strokeWidth: 5.0, strokeCap: StrokeCap.round, strokeJoin: StrokeJoin.round)]),
           MarkerLayer(markers: [
             Marker(point: _points.first, width: 30, height: 30, child: _buildMapMarker(const Color(0xFF32D74B), Icons.play_arrow_rounded)),
@@ -302,7 +322,14 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
             controller: _pageController,
             onPageChanged: (index) => setState(() => _currentImageIndex = index),
             itemCount: images.length,
-            itemBuilder: (context, index) => Image.network(images[index], fit: BoxFit.cover),
+            itemBuilder: (context, index) {
+              return CachedNetworkImage(
+                imageUrl: images[index],
+                fit: BoxFit.cover,
+                placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Color(0xFF32D74B))),
+                errorWidget: (context, url, error) => const Center(child: Icon(Icons.image_not_supported, color: Colors.white24, size: 50)),
+              );
+            },
           ),
           if (images.length > 1)
             Positioned(

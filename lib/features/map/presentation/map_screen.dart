@@ -1,7 +1,6 @@
 // lib/features/map/presentation/map_screen.dart
 import 'dart:async';
 import 'dart:ui';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
@@ -10,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../tracking/providers/tracking_provider.dart';
 import '../../tracking/presentation/save_track_screen.dart';
@@ -26,11 +26,10 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final MapController _mapController = MapController();
   final Dio _dio = Dio();
 
-  // --- ЦВЕТА И СТИЛИ ИЗ ТВОЕГО ДИЗАЙНА ---
   final Color _routeGreen = const Color(0xFF32D74B);
   final Color _userBlue = const Color(0xFF007AFF);
   final Color _glassColor = Colors.black.withOpacity(0.4);
@@ -41,40 +40,97 @@ class _MapScreenState extends State<MapScreen> {
   bool _isLoadingLocation = true;
   bool _isPanelExpanded = false;
 
+  bool _autoFollow = true;
+
   final String _selectedActivity = 'Hiking';
   String _weatherText = 'Loading...';
   IconData _weatherIcon = Icons.cloud_outlined;
 
-  // --- ДАННЫЕ О МАРШРУТЕ ---
   RouteModel? _selectedRoute;
-  WaypointData? _selectedWaypoint; // Для желтых меток
-
-  List<LatLng> _pathToPeak = []; // Линия "Как доехать" (OSRM)
+  WaypointData? _selectedWaypoint;
+  bool _isPanelVisible = false;
+  List<LatLng> _pathToPeak = [];
   bool _isLoadingPath = false;
+  bool _isInitializingTarget = false;
 
   @override
   void initState() {
     super.initState();
     _initLocation();
 
-    // Авто-выбор горы, если перешли с экрана деталей
     if (widget.targetPeakName != null) {
+      _isInitializingTarget = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _autoSelectRoute(widget.targetPeakName!);
-        });
+        _autoSelectRoute(widget.targetPeakName!);
       });
     }
   }
 
-  void _autoSelectRoute(String target) {
+  void _animatedMapMove(LatLng destLocation, double destZoom) {
+    final latTween = Tween<double>(begin: _mapController.camera.center.latitude, end: destLocation.latitude);
+    final lngTween = Tween<double>(begin: _mapController.camera.center.longitude, end: destLocation.longitude);
+    final zoomTween = Tween<double>(begin: _mapController.camera.zoom, end: destZoom);
+
+    final controller = AnimationController(duration: const Duration(milliseconds: 800), vsync: this);
+    final Animation<double> animation = CurvedAnimation(parent: controller, curve: Curves.fastOutSlowIn);
+
+    controller.addListener(() {
+      _mapController.move(
+        LatLng(latTween.evaluate(animation), lngTween.evaluate(animation)),
+        zoomTween.evaluate(animation),
+      );
+    });
+
+    animation.addStatusListener((status) {
+      if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
+        controller.dispose();
+      }
+    });
+
+    controller.forward();
+  }
+
+  void _animatedFitCamera(LatLngBounds bounds, EdgeInsets padding) {
+    try {
+      final target = CameraFit.bounds(bounds: bounds, padding: padding).fit(_mapController.camera);
+      _animatedMapMove(target.center, target.zoom);
+    } catch (e) {
+      _animatedMapMove(bounds.center, 14.0);
+    }
+  }
+
+  Future<void> _autoSelectRoute(String target) async {
     final routeProvider = Provider.of<RouteProvider>(context, listen: false);
+    if (routeProvider.routes.isEmpty) await routeProvider.fetchRoutes();
+
     try {
       final realTarget = target.split('||')[0];
       final route = routeProvider.routes.firstWhere((r) => r.name == realTarget || r.id == realTarget);
-      _onRouteTapped(route);
+      await routeProvider.loadGpxForRoute(route.id);
+
+      if (mounted) {
+        setState(() {
+          _selectedRoute = routeProvider.findById(route.id);
+          _selectedWaypoint = null;
+          _isPanelVisible = true;
+          _pathToPeak.clear();
+          _isInitializingTarget = false;
+        });
+
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (!mounted || _selectedRoute == null) return;
+          if (_selectedRoute!.trackPoints.isNotEmpty) {
+            _animatedFitCamera(
+                LatLngBounds.fromPoints(_selectedRoute!.trackPoints),
+                const EdgeInsets.only(left: 50.0, right: 50.0, top: 50.0, bottom: 350.0)
+            );
+          } else {
+            _animatedMapMove(LatLng(route.latitude, route.longitude), 14.0);
+          }
+        });
+      }
     } catch (e) {
-      debugPrint("Маршрут не найден.");
+      if (mounted) setState(() => _isInitializingTarget = false);
     }
   }
 
@@ -100,7 +156,6 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // --- ПОГОДА ---
   Future<void> _fetchWeather(double lat, double lon) async {
     try {
       final response = await _dio.get('https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true');
@@ -126,31 +181,26 @@ class _MapScreenState extends State<MapScreen> {
     return Icons.cloud_rounded;
   }
 
-  // --- ПУТЬ ДО СТАРТА (OSRM API) ---
   Future<void> _fetchPathToRoute(RouteModel route) async {
     final tracker = Provider.of<TrackingProvider>(context, listen: false);
     final startPoint = tracker.currentLocation ?? _currentLocation;
-
     if (startPoint == null) return;
 
     setState(() { _isLoadingPath = true; _pathToPeak.clear(); });
-
     final destination = route.trailhead;
 
     try {
-      // Используем маршрут driving, чтобы доехать до парковки/шлагбаума
       final url = 'https://router.project-osrm.org/route/v1/driving/${startPoint.longitude},${startPoint.latitude};${destination.longitude},${destination.latitude}?geometries=geojson';
       final response = await _dio.get(url);
-
       if (response.statusCode == 200) {
         final coords = response.data['routes'][0]['geometry']['coordinates'] as List;
         setState(() {
           _pathToPeak = coords.map((c) => LatLng(c[1], c[0])).toList();
           _isLoadingPath = false;
         });
-        // Красиво наезжаем камерой, чтобы было видно оба маршрута
-        _mapController.fitCamera(
-          CameraFit.bounds(bounds: LatLngBounds.fromPoints([startPoint, destination, ...route.trackPoints]), padding: const EdgeInsets.all(50.0)),
+        _animatedFitCamera(
+            LatLngBounds.fromPoints([startPoint, destination, ...route.trackPoints]),
+            const EdgeInsets.only(left: 50.0, right: 50.0, top: 50.0, bottom: 350.0)
         );
       }
     } catch (e) {
@@ -162,7 +212,7 @@ class _MapScreenState extends State<MapScreen> {
     if (_currentMapStyle == MapStyle.satellite) {
       return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
     }
-    return 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'; // Отличная карта для гор
+    return 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png';
   }
 
   void _showMapStyleSelector(BuildContext context) {
@@ -172,88 +222,115 @@ class _MapScreenState extends State<MapScreen> {
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (context) {
           return SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 12),
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-                const SizedBox(height: 24),
-                const Text('Map Type', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.terrain_outlined, color: Colors.white),
-                  title: const Text('Topographic Map', style: TextStyle(color: Colors.white, fontSize: 16)),
-                  trailing: _currentMapStyle == MapStyle.topo ? Icon(Icons.check_circle, color: _userBlue) : null,
-                  onTap: () { setState(() => _currentMapStyle = MapStyle.topo); Navigator.pop(context); },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.satellite_alt_outlined, color: Colors.white),
-                  title: const Text('Satellite', style: TextStyle(color: Colors.white, fontSize: 16)),
-                  trailing: _currentMapStyle == MapStyle.satellite ? Icon(Icons.check_circle, color: _userBlue) : null,
-                  onTap: () { setState(() => _currentMapStyle = MapStyle.satellite); Navigator.pop(context); },
-                ),
-                const SizedBox(height: 24),
-              ],
+            child: Consumer<RouteProvider>(
+                builder: (context, provider, child) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 12),
+                        Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+                        const SizedBox(height: 24),
+                        const Text('Map Layer', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.terrain_outlined, color: Colors.white),
+                          title: const Text('Topographic Map', style: TextStyle(color: Colors.white, fontSize: 16)),
+                          trailing: _currentMapStyle == MapStyle.topo ? Icon(Icons.check_circle, color: _userBlue) : null,
+                          onTap: () { setState(() => _currentMapStyle = MapStyle.topo); Navigator.pop(context); },
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.satellite_alt_outlined, color: Colors.white),
+                          title: const Text('Satellite', style: TextStyle(color: Colors.white, fontSize: 16)),
+                          trailing: _currentMapStyle == MapStyle.satellite ? Icon(Icons.check_circle, color: _userBlue) : null,
+                          onTap: () { setState(() => _currentMapStyle = MapStyle.satellite); Navigator.pop(context); },
+                        ),
+                        const Padding(padding: EdgeInsets.symmetric(vertical: 8.0), child: Divider(color: Colors.white12)),
+                        const Text('Offline Maps', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: provider.isRegionDownloaded ? _routeGreen.withOpacity(0.5) : Colors.white12)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.map_rounded, color: Colors.white, size: 28),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Almaty Mountains', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                        Text(provider.isRegionDownloaded ? 'Available Offline' : '≈ 45 MB • Map & Routes', style: TextStyle(color: provider.isRegionDownloaded ? _routeGreen : Colors.white54, fontSize: 13)),
+                                      ],
+                                    ),
+                                  ),
+                                  if (provider.isRegionDownloaded)
+                                    Icon(Icons.check_circle_rounded, color: _routeGreen, size: 28)
+                                  else if (!provider.isDownloadingRegion)
+                                    IconButton(icon: const Icon(Icons.download_rounded, color: Colors.white), onPressed: () => provider.downloadAlmatyRegion())
+                                ],
+                              ),
+                              if (provider.isDownloadingRegion) ...[
+                                const SizedBox(height: 16),
+                                ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: provider.downloadProgress, backgroundColor: Colors.white12, color: _routeGreen, minHeight: 8)),
+                                const SizedBox(height: 8),
+                                Center(child: Text('${(provider.downloadProgress * 100).toInt()}% downloading...', style: const TextStyle(color: Colors.white54, fontSize: 12))),
+                              ]
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  );
+                }
             ),
           );
         }
     );
   }
 
-  void _onRouteTapped(RouteModel route) {
+  void _onRouteTapped(RouteModel route) async {
     setState(() {
       _selectedRoute = route;
       _selectedWaypoint = null;
-      _pathToPeak.clear(); // Очищаем старый путь доезда
+      _isPanelVisible = true;
+      _pathToPeak.clear();
     });
-
-    if (route.trackPoints.isNotEmpty) {
-      _mapController.fitCamera(
-        CameraFit.bounds(bounds: LatLngBounds.fromPoints([route.trackPoints.first, route.trackPoints.last]), padding: const EdgeInsets.all(70.0)),
-      );
-    } else {
-      _mapController.move(LatLng(route.latitude, route.longitude), 14.0);
+    final routeProvider = Provider.of<RouteProvider>(context, listen: false);
+    await routeProvider.loadGpxForRoute(route.id);
+    if (mounted) {
+      setState(() { _selectedRoute = routeProvider.findById(route.id); });
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (!mounted || _selectedRoute == null) return;
+        if (_selectedRoute!.trackPoints.isNotEmpty) {
+          _animatedFitCamera(LatLngBounds.fromPoints(_selectedRoute!.trackPoints), const EdgeInsets.only(left: 50.0, right: 50.0, top: 50.0, bottom: 350.0));
+        } else {
+          _animatedMapMove(LatLng(route.latitude, route.longitude), 14.0);
+        }
+      });
     }
   }
 
-  void _clearSelectedRoute() {
-    setState(() {
-      _selectedRoute = null;
-      _selectedWaypoint = null;
-      _pathToPeak.clear();
-    });
-  }
-
-  void _zoomIn() => _mapController.move(_mapController.camera.center, _mapController.camera.zoom + 1.0);
-  void _zoomOut() => _mapController.move(_mapController.camera.center, _mapController.camera.zoom - 1.0);
-  void _moveToCurrentLocation() {
-    final tracker = Provider.of<TrackingProvider>(context, listen: false);
-    if (tracker.currentLocation != null) _mapController.move(tracker.currentLocation!, 16.0);
-    else if (_currentLocation != null) _mapController.move(_currentLocation!, 16.0);
-  }
+  void _closePanel() { setState(() { _isPanelVisible = false; _selectedRoute = null; _selectedWaypoint = null; _pathToPeak.clear(); }); }
+  void _zoomIn() => _animatedMapMove(_mapController.camera.center, _mapController.camera.zoom + 1.0);
+  void _zoomOut() => _animatedMapMove(_mapController.camera.center, _mapController.camera.zoom - 1.0);
+  void _moveToCurrentLocation() { setState(() => _autoFollow = true); final tracker = Provider.of<TrackingProvider>(context, listen: false); if (tracker.currentLocation != null) _animatedMapMove(tracker.currentLocation!, 16.0); else if (_currentLocation != null) _animatedMapMove(_currentLocation!, 16.0); }
 
   @override
   Widget build(BuildContext context) {
     final tracker = Provider.of<TrackingProvider>(context);
     final routeProvider = Provider.of<RouteProvider>(context);
 
-    if (widget.targetPeakName != null && _selectedRoute == null && !routeProvider.isLoading) {
-      try {
-        final target = routeProvider.routes.firstWhere(
-                (r) => r.name.toLowerCase() == widget.targetPeakName!.toLowerCase()
-        );
-
-        // Используем Future.microtask чтобы не вызывать setState во время build
-        Future.microtask(() {
-          setState(() {
-            _selectedRoute = target;
-            // Перемещаем камеру к началу маршрута
-            _mapController.move(LatLng(target.latitude, target.longitude), 14.0);
-          });
-        });
-      } catch (e) {
-        print("Маршрут ${widget.targetPeakName} не найден в списке");
-      }
+    if (tracker.isTracking && tracker.currentLocation != null && _autoFollow) {
+      WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _mapController.move(tracker.currentLocation!, _mapController.camera.zoom); });
     }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -263,43 +340,37 @@ class _MapScreenState extends State<MapScreen> {
         body: Stack(
           children: [
             _buildMap(context, tracker, routeProvider),
-
-            // --- ЭЛЕМЕНТЫ УПРАВЛЕНИЯ КАРТОЙ (Из твоего дизайна) ---
+            if (_isInitializingTarget) Positioned.fill(child: Container(color: Colors.black.withOpacity(0.7), child: const Center(child: CircularProgressIndicator(color: Color(0xFF32D74B))))),
             SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildGlassButton(icon: Icons.keyboard_arrow_down_rounded, onTap: () => context.pop()),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildGlassPanel(
-                          child: IconButton(icon: const Icon(Icons.layers_rounded, color: Colors.white), onPressed: () => _showMapStyleSelector(context)),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildGlassPanel(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(icon: const Icon(Icons.add, color: Colors.white), onPressed: _zoomIn),
-                              Container(height: 1, width: 24, color: Colors.white24),
-                              IconButton(icon: const Icon(Icons.remove, color: Colors.white), onPressed: _zoomOut),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildGlassButton(icon: Icons.my_location_rounded, onTap: _moveToCurrentLocation),
-                      ],
-                    ),
-                  ],
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: _buildGlassButton(
+                    icon: Icons.close_rounded, // Кнопка "крестик" для закрытия
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
                 ),
               ),
             ),
-
-            // --- КАРТОЧКА ФОТОГРАФИИ МЕТКИ ---
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildGlassPanel(child: IconButton(icon: const Icon(Icons.layers_rounded, color: Colors.white), onPressed: () => _showMapStyleSelector(context))),
+                      const SizedBox(height: 16),
+                      _buildGlassPanel(child: Column(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: const Icon(Icons.add, color: Colors.white), onPressed: _zoomIn), Container(height: 1, width: 24, color: Colors.white24), IconButton(icon: const Icon(Icons.remove, color: Colors.white), onPressed: _zoomOut)])),
+                      const SizedBox(height: 16),
+                      _buildGlassButton(icon: Icons.my_location_rounded, onTap: _moveToCurrentLocation, iconColor: _autoFollow && tracker.isTracking ? const Color(0xFF32D74B) : Colors.white),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             if (_selectedWaypoint != null)
               Positioned(
                 top: 100, left: 20, right: 20,
@@ -313,35 +384,20 @@ class _MapScreenState extends State<MapScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.network(_selectedWaypoint!.imageUrl, height: 180, fit: BoxFit.cover),
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(_selectedWaypoint!.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                                IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => setState(() => _selectedWaypoint = null))
-                              ],
-                            ),
-                          )
+                          CachedNetworkImage(imageUrl: _selectedWaypoint!.imageUrl, height: 180, fit: BoxFit.cover),
+                          Padding(padding: const EdgeInsets.all(16.0), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(_selectedWaypoint!.name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => setState(() => _selectedWaypoint = null))]))
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
-
-            // --- НИЖНЯЯ ПАНЕЛЬ С АНИМАЦИЕЙ ---
             if (_selectedWaypoint == null)
               Positioned(
                 left: 0, right: 0, bottom: 0,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  transitionBuilder: (child, animation) => SlideTransition(
-                    position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(animation),
-                    child: child,
-                  ),
-                  child: _getBottomPanelContent(tracker),
+                child: GestureDetector(
+                  onVerticalDragUpdate: (details) { if (details.primaryDelta! > 5 && tracker.status == TrackingStatus.idle && _selectedRoute != null) _closePanel(); },
+                  child: AnimatedSwitcher(duration: const Duration(milliseconds: 300), switchInCurve: Curves.easeOutCubic, switchOutCurve: Curves.easeInCubic, child: _getBottomPanelContent(tracker)),
                 ),
               ),
           ],
@@ -350,22 +406,175 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // Логика выбора нижней панели
+  Widget _buildMap(BuildContext context, TrackingProvider tracker, RouteProvider routeProvider) {
+    LatLng center = tracker.currentLocation ?? _currentLocation ?? const LatLng(43.1410, 77.0700);
+
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedWaypoint = null);
+        if (_isPanelVisible && tracker.status == TrackingStatus.idle) _closePanel();
+      },
+      child: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: center,
+          initialZoom: 12.0,
+          onTap: (_, __) {
+            setState(() => _selectedWaypoint = null);
+            if (_isPanelVisible && tracker.status == TrackingStatus.idle) _closePanel();
+          },
+          onPositionChanged: (position, hasGesture) {
+            if (hasGesture && _autoFollow) {
+              setState(() => _autoFollow = false);
+            }
+          },
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: _mapUrlTemplate,
+            userAgentPackageName: 'com.hikingapp.kazakhstan',
+            subdomains: const ['a', 'b', 'c'],
+            maxNativeZoom: 17,
+            maxZoom: 22,
+            tileProvider: CachedTileProvider(),
+          ),
+
+          if (_pathToPeak.isNotEmpty)
+            PolylineLayer(
+              polylines: [
+                Polyline(points: _pathToPeak, strokeWidth: 4.0, color: Colors.lightBlueAccent.withOpacity(0.9), borderStrokeWidth: 1.5, borderColor: Colors.blue[900]!)
+              ],
+            ),
+
+          if (_selectedRoute != null && _selectedRoute!.trackPoints.isNotEmpty)
+            PolylineLayer(
+              polylines: [
+                Polyline(points: _selectedRoute!.trackPoints, strokeWidth: 5.0, color: _routeGreen, borderStrokeWidth: 2.0, borderColor: Colors.black87)
+              ],
+            ),
+
+          if (tracker.routePoints.isNotEmpty)
+            PolylineLayer(polylines: [Polyline(points: tracker.routePoints, strokeWidth: 6.0, color: _userBlue, borderStrokeWidth: 1.5, borderColor: Colors.white)]),
+
+          MarkerLayer(
+            markers: [
+              if (tracker.currentLocation != null || _currentLocation != null)
+                Marker(
+                  point: tracker.currentLocation ?? _currentLocation!, width: 24, height: 24,
+                  child: Container(decoration: BoxDecoration(color: _userBlue, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4)])),
+                ),
+
+              ...routeProvider.routes.where((r) => r.latitude != 0.0 || r.trackPoints.isNotEmpty).map((route) {
+                bool isSelected = _selectedRoute?.id == route.id;
+                LatLng markerPos = (route.trackPoints.isNotEmpty) ? route.trackPoints.last : LatLng(route.latitude, route.longitude);
+
+                return Marker(
+                  point: markerPos,
+                  width: 50, height: 50, alignment: Alignment.topCenter,
+                  child: GestureDetector(
+                    onTap: () => _onRouteTapped(route),
+                    child: Container(
+                      decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFFF453A) : Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 4)]
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(Icons.terrain_rounded, color: isSelected ? Colors.white : const Color(0xFFFF453A), size: 24),
+                    ),
+                  ),
+                );
+              }),
+
+              if (_selectedRoute != null && _selectedRoute!.trackPoints.isNotEmpty) ...[
+                Marker(
+                  point: _selectedRoute!.trackPoints.first,
+                  width: 40, height: 40, alignment: Alignment.topCenter,
+                  child: Container(decoration: const BoxDecoration(color: Color(0xFF32D74B), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)]), padding: const EdgeInsets.all(4), child: const Icon(Icons.flag_circle_rounded, color: Colors.white, size: 24)),
+                ),
+                ..._selectedRoute!.waypoints.map((wp) {
+                  bool isSelected = _selectedWaypoint == wp;
+                  return Marker(
+                    point: wp.location,
+                    width: isSelected ? 40 : 30, height: isSelected ? 40 : 30, alignment: Alignment.topCenter,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _selectedWaypoint = wp);
+                        _animatedMapMove(wp.location, 16.0);
+                      },
+                      child: Icon(Icons.location_on_rounded, color: isSelected ? Colors.yellowAccent : Colors.orangeAccent, size: isSelected ? 40 : 30, shadows: const [Shadow(color: Colors.black54, blurRadius: 4)]),
+                    ),
+                  );
+                }),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _getBottomPanelContent(TrackingProvider tracker) {
     if (tracker.status != TrackingStatus.idle) {
-      // ИДЕТ ЗАПИСЬ (Свободная или по маршруту)
-      return _buildRoutePanel(tracker, key: const ValueKey('tracking_panel'));
-    } else if (_selectedRoute != null) {
-      // ВЫБРАНА ГОРА, НО ЗАПИСЬ НЕ ИДЕТ
-      return _buildMiniRouteInfo(tracker, key: const ValueKey('peak_info'));
+      return _buildTrackingPanel(tracker, key: const ValueKey('tracking_panel'));
+    } else if (_selectedRoute != null && _isPanelVisible) {
+      return _buildMiniRouteInfo(tracker, key: const ValueKey('route_info_panel'));
     } else {
-      // СВОБОДНЫЙ РЕЖИМ (Idle)
-      return _buildRoutePanel(tracker, key: const ValueKey('free_idle_panel'));
+      return _buildFreeTrackingPanel(tracker, key: const ValueKey('free_roam_panel'));
     }
   }
 
-  // --- МИНИ-КАРТОЧКА ГОРЫ ---
-  Widget _buildMiniRouteInfo(TrackingProvider tracker, {required Key key}) {
+  Widget _buildFreeTrackingPanel(TrackingProvider tracker, {Key? key}) {
+    return ClipRRect(
+      key: key,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+          decoration: BoxDecoration(color: Colors.black.withOpacity(0.65), border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2), width: 1.0))),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Record Activity', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                  Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
+                      child: Row(
+                          children: const [
+                            Icon(Icons.directions_walk_rounded, color: Color(0xFF32D74B), size: 18),
+                            SizedBox(width: 6),
+                            Text('Hiking', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ]
+                      )
+                  )
+                ],
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF32D74B), foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 28),
+                  label: const Text('Start Recording', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                  onPressed: () {
+                    setState(() => _autoFollow = true);
+                    tracker.startTracking();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniRouteInfo(TrackingProvider tracker, {Key? key}) {
     Color difficultyColor = _selectedRoute!.difficulty.toUpperCase() == 'HARD' ? const Color(0xFFFF453A) : _selectedRoute!.difficulty.toUpperCase() == 'EASY' ? const Color(0xFF32D74B) : const Color(0xFFFF9F0A);
 
     return ClipRRect(
@@ -384,7 +593,7 @@ class _MapScreenState extends State<MapScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(child: Text(_selectedRoute!.name, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold))),
-                  IconButton(icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 28), onPressed: _clearSelectedRoute)
+                  IconButton(icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 28), onPressed: _closePanel)
                 ],
               ),
               const SizedBox(height: 8),
@@ -424,7 +633,8 @@ class _MapScreenState extends State<MapScreen> {
                           icon: const Icon(Icons.navigation_rounded),
                           label: const Text('Start Trek', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                           onPressed: () {
-                            tracker.startTracking(); // Начинаем запись Провайдером!
+                            setState(() => _autoFollow = true);
+                            tracker.startTracking();
                           },
                         ),
                       )
@@ -446,8 +656,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // --- ГЛАВНАЯ ПАНЕЛЬ ТРЕКЕРА (Твой дизайн) ---
-  Widget _buildRoutePanel(TrackingProvider tracker, {Key? key}) {
+  Widget _buildTrackingPanel(TrackingProvider tracker, {Key? key}) {
     return GestureDetector(
       key: key,
       onVerticalDragUpdate: (details) {
@@ -471,8 +680,6 @@ class _MapScreenState extends State<MapScreen> {
                     child: Container(width: 40, height: 5, margin: const EdgeInsets.only(bottom: 20, top: 4), decoration: BoxDecoration(color: Colors.white.withOpacity(0.4), borderRadius: BorderRadius.circular(3))),
                   ),
                 ),
-
-                // Раскрывающаяся инфа (Погода, активность)
                 AnimatedCrossFade(
                   firstChild: const SizedBox(height: 8),
                   secondChild: Padding(
@@ -490,19 +697,15 @@ class _MapScreenState extends State<MapScreen> {
                   crossFadeState: _isPanelExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
                   duration: const Duration(milliseconds: 300),
                 ),
-
-                // Цифры трекера
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildStatItem(value: tracker.status == TrackingStatus.idle ? "0:00" : tracker.formattedTime, unit: '', label: 'Time'),
                     _buildStatItem(value: tracker.totalDistanceKm.toStringAsFixed(2), unit: 'km', label: 'Distance'),
-                    _buildStatItem(value: "--", unit: 'm', label: 'Elev. gain'), // Провайдер пока не считает высоту
+                    _buildStatItem(value: "--", unit: 'm', label: 'Elev. gain'),
                   ],
                 ),
                 const SizedBox(height: 32),
-
-                // Кнопки управления (Start / Pause / Stop)
                 _buildActionButtons(tracker),
               ],
             ),
@@ -543,17 +746,6 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildActionButtons(TrackingProvider tracker) {
-    if (tracker.status == TrackingStatus.idle) {
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 20), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
-          icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 28),
-          label: const Text('Start Free Tracking', style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w800)),
-          onPressed: () => tracker.startTracking(),
-        ),
-      );
-    }
     return Row(
       children: [
         Expanded(
@@ -561,29 +753,21 @@ class _MapScreenState extends State<MapScreen> {
             style: FilledButton.styleFrom(backgroundColor: tracker.isPaused ? Colors.white : Colors.white.withOpacity(0.15), foregroundColor: tracker.isPaused ? Colors.black : Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
             icon: Icon(tracker.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded),
             label: Text(tracker.isPaused ? 'Resume' : 'Pause', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            onPressed: tracker.isPaused ? () => tracker.resumeTracking() : () => tracker.pauseTracking(),
+            onPressed: tracker.isPaused ? () {
+              setState(() => _autoFollow = true);
+              tracker.resumeTracking();
+            } : () => tracker.pauseTracking(),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: FilledButton.icon(
-            style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFFF453A),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))
-            ),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF453A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
             icon: const Icon(Icons.stop_rounded),
             label: const Text('Stop & Save', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             onPressed: () async {
-              // 1. Ставим трекер на паузу
               tracker.pauseTracking();
-
-              // 2. Открываем наш крутой экран сохранения
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SaveTrackScreen())
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const SaveTrackScreen()));
             },
           ),
         ),
@@ -591,7 +775,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildGlassButton({required IconData icon, required VoidCallback onTap}) {
+  Widget _buildGlassButton({required IconData icon, required VoidCallback onTap, Color iconColor = Colors.white}) {
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
@@ -601,7 +785,7 @@ class _MapScreenState extends State<MapScreen> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: _glassColor, border: Border.all(color: _glassBorder), borderRadius: BorderRadius.circular(24)),
-            child: Icon(icon, color: Colors.white, size: 28),
+            child: Icon(icon, color: iconColor, size: 28),
           ),
         ),
       ),
@@ -617,119 +801,11 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
   }
+}
 
-  Widget _buildMap(BuildContext context, TrackingProvider tracker, RouteProvider routeProvider) {
-    if (_isLoadingLocation) return const Center(child: CircularProgressIndicator(color: Colors.white));
-
-    // Центр карты: если идет запись - следим за трекером, иначе за выбранной горой
-    LatLng center = tracker.currentLocation ?? _currentLocation ?? const LatLng(43.1410, 77.0700);
-
-    return GestureDetector(
-      onTap: () { setState(() => _selectedWaypoint = null); },
-      child: FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          initialCenter: center,
-          initialZoom: 12.0,
-          onTap: (_, __) => setState(() => _selectedWaypoint = null),
-        ),
-        children: [
-          TileLayer(
-            urlTemplate: _mapUrlTemplate,
-            userAgentPackageName: 'com.hikingapp.kazakhstan',
-            subdomains: const ['a', 'b', 'c'],
-
-            maxNativeZoom: 17,
-            maxZoom: 22,
-          ),
-
-          // 1. ЛИНИЯ ДОЕЗДА ДО СТАРТА (OSRM - Светло-синяя)
-          if (_pathToPeak.isNotEmpty)
-            PolylineLayer(
-              polylines: [
-                Polyline(
-                    points: _pathToPeak,
-                    strokeWidth: 4.0,
-                    color: Colors.lightBlueAccent.withOpacity(0.9),
-                    borderStrokeWidth: 1.5,
-                    borderColor: Colors.blue[900]!
-                )
-              ],
-            ),
-
-          // 2. ЗЕЛЕНАЯ ТРОПА ГОРЫ (GPX)
-          if (_selectedRoute != null && _selectedRoute!.trackPoints.isNotEmpty)
-            PolylineLayer(
-              polylines: [
-                Polyline(points: _selectedRoute!.trackPoints, strokeWidth: 5.0, color: _routeGreen, borderStrokeWidth: 2.0, borderColor: Colors.black87)
-              ],
-            ),
-
-          // 3. ТВОЙ ТЕКУЩИЙ МАРШРУТ ЗАПИСИ (Синий)
-          if (tracker.routePoints.isNotEmpty)
-            PolylineLayer(
-                polylines: [
-                  Polyline(
-                      points: tracker.routePoints,
-                      strokeWidth: 6.0,
-                      strokeCap: StrokeCap.round,
-                      strokeJoin: StrokeJoin.round,
-                      color: _userBlue,
-                      borderStrokeWidth: 1.5,
-                      borderColor: Colors.white
-                  )
-                ]
-            ),
-
-          MarkerLayer(
-            markers: [
-              // Моя локация
-              if (tracker.currentLocation != null || _currentLocation != null)
-                Marker(
-                  point: tracker.currentLocation ?? _currentLocation!, width: 24, height: 24,
-                  child: Container(decoration: BoxDecoration(color: _userBlue, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4)])),
-                ),
-
-              // Иконки всех гор из БД
-              ...routeProvider.routes.map((route) {
-                bool isSelected = _selectedRoute?.id == route.id;
-                return Marker(
-                  point: LatLng(route.latitude, route.longitude),
-                  width: 40, height: 40, alignment: Alignment.topCenter,
-                  child: GestureDetector(
-                    onTap: () => _onRouteTapped(route),
-                    child: Container(
-                      decoration: BoxDecoration(color: isSelected ? const Color(0xFFFF453A) : Colors.white, shape: BoxShape.circle, boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 4)]),
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(Icons.terrain_rounded, color: isSelected ? Colors.white : const Color(0xFFFF453A), size: 24),
-                    ),
-                  ),
-                );
-              }),
-
-              // Зеленый флаг на старте + Желтые метки
-              if (_selectedRoute != null && _selectedRoute!.trackPoints.isNotEmpty) ...[
-                Marker(
-                  point: _selectedRoute!.trackPoints.first,
-                  width: 40, height: 40, alignment: Alignment.topCenter,
-                  child: Container(decoration: const BoxDecoration(color: Color(0xFF32D74B), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)]), padding: const EdgeInsets.all(4), child: const Icon(Icons.flag_circle_rounded, color: Colors.white, size: 24)),
-                ),
-                ..._selectedRoute!.waypoints.map((wp) {
-                  bool isSelected = _selectedWaypoint == wp;
-                  return Marker(
-                    point: wp.location,
-                    width: isSelected ? 40 : 30, height: isSelected ? 40 : 30, alignment: Alignment.topCenter,
-                    child: GestureDetector(
-                      onTap: () { setState(() => _selectedWaypoint = wp); _mapController.move(wp.location, 16.0); },
-                      child: Icon(Icons.location_on_rounded, color: isSelected ? Colors.yellowAccent : Colors.orangeAccent, size: isSelected ? 40 : 30, shadows: const [Shadow(color: Colors.black54, blurRadius: 4)]),
-                    ),
-                  );
-                }),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
+class CachedTileProvider extends TileProvider {
+  @override
+  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
+    return CachedNetworkImageProvider(getTileUrl(coordinates, options));
   }
 }
