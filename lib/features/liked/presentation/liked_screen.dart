@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../tracking/providers/tracking_provider.dart';
+import '../../../core/widgets/custom_header.dart';
 
 class LikedScreen extends StatefulWidget {
   const LikedScreen({super.key});
@@ -80,9 +81,15 @@ class _LikedScreenState extends State<LikedScreen> with SingleTickerProviderStat
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
+        toolbarHeight: 80, // ЕДИНАЯ ВЫСОТА
+        titleSpacing: 0,
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Activity', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
+        title: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24), // ЕДИНЫЙ ОТСТУП
+          child: CustomHeader(title: 'ACTIVITY'),
+        ),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: const Color(0xFF32D74B),
@@ -99,7 +106,6 @@ class _LikedScreenState extends State<LikedScreen> with SingleTickerProviderStat
         controller: _tabController,
         children: [
           _buildActivityTab(activities),
-          // Заглушка для второй вкладки
           const Center(child: Text("No saved routes yet.", style: TextStyle(color: Colors.white54))),
         ],
       ),

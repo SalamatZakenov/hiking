@@ -147,7 +147,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildNavItem(BuildContext context, IconData icon, String label, int index, bool isSelected) {
-    final color = isSelected ? const Color(0xFF32D74B) : Colors.white70;
+    final color = isSelected ? const Color(0xFF32D74B) : Colors.white;
 
     return GestureDetector(
       onTap: () => _onTap(context, index),
@@ -193,7 +193,7 @@ class DashboardScreen extends StatelessWidget {
             BoxShadow(color: const Color(0xFF32D74B).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))
           ],
         ),
-        child: const Icon(Icons.near_me_outlined, color: Colors.black, size: 32),
+        child: const Icon(Icons.near_me_outlined, color: Colors.white, size: 32),
       ),
     );
   }

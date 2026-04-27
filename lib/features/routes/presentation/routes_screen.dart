@@ -8,6 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../data/models/route_model.dart';
+import '../../../core/widgets/custom_header.dart';
 
 class RoutesScreen extends StatelessWidget {
   const RoutesScreen({super.key});
@@ -29,7 +30,6 @@ class RoutesScreen extends StatelessWidget {
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                // --- 1 & 2. ПЛАВАЮЩАЯ ШАПКА И ПОИСК ---
                 SliverAppBar(
                   backgroundColor: Colors.black,
                   floating: true,
@@ -37,78 +37,50 @@ class RoutesScreen extends StatelessWidget {
                   elevation: 0,
                   automaticallyImplyLeading: false,
                   titleSpacing: 0,
-                  toolbarHeight: 70,
-
-                  title: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.filter_hdr_rounded, color: Color(0xFF32D74B), size: 28),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'SHYN',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2.0,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.08),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withOpacity(0.05)),
-                          ),
-                          child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
-                        )
-                      ],
-                    ),
+                  toolbarHeight: 80, // ЕДИНАЯ ВЫСОТА
+                  title: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24), // ЕДИНЫЙ ОТСТУП
+                    child: CustomHeader(title: 'ROUTES'),
                   ),
-
+                  // КОМПАКТНЫЙ ПОИСК + ФИЛЬТР
                   bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(96),
+                    preferredSize: const Size.fromHeight(60), // Высота как в Community
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
                       child: Row(
                         children: [
                           Expanded(
                             child: Container(
-                              height: 56,
+                              height: 44, // Компактный размер
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(18),
+                                  color: Colors.white.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(16)
                               ),
                               child: TextField(
-                                style: const TextStyle(color: Colors.white),
+                                style: const TextStyle(color: Colors.white, fontSize: 15),
                                 decoration: const InputDecoration(
                                   hintText: 'Search routes...',
-                                  hintStyle: TextStyle(color: Colors.white54),
-                                  prefixIcon: Icon(Icons.search, color: Colors.white54),
+                                  hintStyle: TextStyle(color: Colors.white54, fontSize: 15),
+                                  prefixIcon: Icon(Icons.search_rounded, color: Colors.white54, size: 22),
                                   border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(vertical: 18),
+                                  contentPadding: EdgeInsets.symmetric(vertical: 12),
                                 ),
                                 onChanged: (val) => routeProvider.searchRoutes(val),
                               ),
                             ),
                           ),
                           const SizedBox(width: 12),
+                          // КНОПКА ФИЛЬТРА (тоже 44x44)
                           Container(
-                            height: 56,
-                            width: 56,
+                            height: 44,
+                            width: 44,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(18),
+                                color: Colors.white.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(16)
                             ),
                             child: IconButton(
-                              icon: const Icon(Icons.tune_rounded, color: Colors.white),
-                              onPressed: () { HapticFeedback.lightImpact(); },
+                                icon: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+                                onPressed: () { HapticFeedback.lightImpact(); }
                             ),
                           ),
                         ],
@@ -116,18 +88,11 @@ class RoutesScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // --- 3. СПИСОК МАРШРУТОВ ---
                 if (routeProvider.isLoading)
-                  const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator(color: Color(0xFF32D74B))),
-                  )
+                  const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: Color(0xFF32D74B))))
                 else if (routeProvider.filteredRoutes.isEmpty)
-                  const SliverFillRemaining(
-                    child: Center(child: Text('No routes found.', style: TextStyle(color: Colors.white54))),
-                  )
+                  const SliverFillRemaining(child: Center(child: Text('No routes found.', style: TextStyle(color: Colors.white54))))
                 else
                   SliverPadding(
                     padding: const EdgeInsets.only(left: 24, right: 24, bottom: 120),
