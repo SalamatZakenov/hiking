@@ -62,20 +62,24 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/logo.png
+    - assets/logo_v2.png
+    - assets/splash_logo.png
+    - assets/onboarding.png
+    - assets/google_logo.png
+    - assets/facebook_logo.png
 
 
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/logo.png"
+  image_path: "assets/logo_v2.png"
 
 flutter_native_splash:
-  color: "#212B36"
-  image: "assets/logo.png"
+  color: "#151C24"
+  image: "assets/splash_logo.png"
   android_12:
-    color: "#212B36"
-    image: "assets/logo.png"
+    color: "#151C24"
+    image: "assets/splash_logo.png"
 
 
   # An image asset can refer to one or more resolution-specific "variants", see

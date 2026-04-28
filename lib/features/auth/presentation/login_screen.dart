@@ -68,24 +68,13 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Премиальная иконка (как на экране регистрации)
+
+              // --- НАШ НОВЫЙ ЛОГОТИП ---
               Center(
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: AppTheme.iconDark,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.cardSlate.withOpacity(0.5), width: 4),
-                  ),
-                  child: Container(
-                    margin: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppTheme.cardSlate, width: 2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.landscape_rounded, size: 36, color: Colors.white),
-                  ),
+                child: Image.asset(
+                  'assets/splash_logo.png',
+                  height: 120, // Оптимальный размер, чтобы было видно и горы, и текст
+                  fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(height: 32),

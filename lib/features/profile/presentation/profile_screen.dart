@@ -5,10 +5,11 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/custom_header.dart';
-import '../../../core/widgets/feed_post_card.dart'; // <--- ИМПОРТ НАШЕГО НОВОГО ВИДЖЕТА
+import '../../../core/widgets/feed_post_card.dart';
 
 import '../../tracking/providers/tracking_provider.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../tracking/data/models/local_track.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -40,6 +41,36 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // Метод для вычисления недельного стрика (недель подряд)
+  int _calculateWeeklyStreak(List<LocalTrack> tracks) {
+    if (tracks.isEmpty) return 0;
+
+    // Преобразуем даты в номера недель (с поправкой на понедельник)
+    Set<int> activeWeeks = tracks.map((t) {
+      return (t.date.millisecondsSinceEpoch ~/ 86400000 + 3) ~/ 7;
+    }).toSet();
+
+    int currentWeek = (DateTime.now().millisecondsSinceEpoch ~/ 86400000 + 3) ~/ 7;
+    int streak = 0;
+
+    // Если на этой неделе была активность, считаем от нее.
+    // Если на этой еще не было, но была на прошлой, считаем от прошлой.
+    if (activeWeeks.contains(currentWeek)) {
+      int check = currentWeek;
+      while (activeWeeks.contains(check)) {
+        streak++;
+        check--;
+      }
+    } else if (activeWeeks.contains(currentWeek - 1)) {
+      int check = currentWeek - 1;
+      while (activeWeeks.contains(check)) {
+        streak++;
+        check--;
+      }
+    }
+    return streak;
+  }
+
   @override
   Widget build(BuildContext context) {
     final tracker = Provider.of<TrackingProvider>(context);
@@ -48,6 +79,11 @@ class ProfileScreen extends StatelessWidget {
     final tracks = tracker.savedTracks;
     final int totalHikes = tracks.length;
     final double totalDistance = tracks.fold(0.0, (sum, track) => sum + track.distanceKm);
+    final int weeklyStreak = _calculateWeeklyStreak(tracks); // Вычисляем стрик
+
+    // Генерация никнейма из имени пользователя
+    final String rawName = authProvider.user?.username ?? 'Salamat Zakenov';
+    final String handle = '@${rawName.replaceAll(' ', '').toLowerCase()}';
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -62,7 +98,7 @@ class ProfileScreen extends StatelessWidget {
           child: CustomHeader(
             title: 'PROFILE',
             actions: [
-              GlassButton(icon: Icons.notifications_none_rounded, onTap: () {}),
+              // Убрали кнопку уведомлений, оставили только настройки (Logout)
               GlassButton(icon: Icons.settings_rounded, onTap: () => _showLogoutDialog(context, authProvider)),
             ],
           ),
@@ -71,24 +107,67 @@ class ProfileScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const SizedBox(height: 20),
-            Container(
-              width: 100, height: 100, alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white24, width: 2),
-                color: const Color(0xFF32D74B).withOpacity(0.2),
-              ),
-              child: Text(
-                (authProvider.user?.username ?? 'S').substring(0, 1).toUpperCase(),
-                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Color(0xFF32D74B)),
+            const SizedBox(height: 10),
+
+            // --- 1. НОВАЯ ШАПКА ПРОФИЛЯ КАК НА РЕФЕРЕНСЕ ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      // Аватар слева
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: const Color(0xFF32D74B).withOpacity(0.2),
+                        child: Text(
+                          rawName[0].toUpperCase(),
+                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF32D74B)),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // Имя и Никнейм справа от аватара
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              rawName,
+                              style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              handle,
+                              style: const TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Статистика подписок (Followers / Following)
+                  RichText(
+                    text: const TextSpan(
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                      children: [
+                        TextSpan(text: '0', style: TextStyle(fontWeight: FontWeight.bold)),
+                        TextSpan(text: ' followers  ·  ', style: TextStyle(color: Colors.white70)),
+                        TextSpan(text: '0', style: TextStyle(fontWeight: FontWeight.bold)),
+                        TextSpan(text: ' following', style: TextStyle(color: Colors.white70)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Text(authProvider.user?.username ?? 'Salamat Zakenov', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-            Text(authProvider.user?.email ?? 'salamat@zakenov.com', style: const TextStyle(color: Colors.white54, fontSize: 16)),
             const SizedBox(height: 32),
 
+            // --- 2. БЛОК СТАТИСТИКИ (ДОБАВЛЕН STREAK) ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: ClipRRect(
@@ -104,6 +183,8 @@ class ProfileScreen extends StatelessWidget {
                         _buildStatItem(totalHikes.toString(), 'Activities'),
                         Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
                         _buildStatItem('${totalDistance.toStringAsFixed(1)} km', 'Distance'),
+                        Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
+                        _buildStatItem('$weeklyStreak wks', 'Streak'), // Новый элемент
                       ],
                     ),
                   ),
@@ -112,6 +193,7 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 40),
 
+            // --- 3. ЛЕНТА ПОСТОВ ПОЛЬЗОВАТЕЛЯ ---
             if (tracks.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(32.0),
@@ -120,10 +202,10 @@ class ProfileScreen extends StatelessWidget {
             else
               ListView.builder(
                 shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(), // Чтобы не ломать скролл родительского SingleChildScrollView
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: tracks.length,
                 itemBuilder: (context, index) {
-                  return FeedPostCard(track: tracks[index]); // <--- ИСПОЛЬЗУЕМ ОДИНАКОВУЮ КАРТОЧКУ
+                  return FeedPostCard(track: tracks[index]);
                 },
               ),
             const SizedBox(height: 50),
@@ -133,12 +215,13 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // Вспомогательный виджет для элементов статистики
   Widget _buildStatItem(String value, String label) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 14)),
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13)),
       ],
     );
   }

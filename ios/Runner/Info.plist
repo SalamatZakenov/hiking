@@ -78,23 +78,23 @@
 		<key>UIStatusBarHidden</key>
 		<false/>
 		<key>CFBundleURLTypes</key>
-        	<array>
-        		<dict>
-        			<key>CFBundleTypeRole</key>
-        			<string>Editor</string>
-        			<key>CFBundleURLName</key>
-        			<string>shyn.app</string>
-        			<key>CFBundleURLSchemes</key>
-        			<array>
-        				<string>shynapp</string>
-        			</array>
-        		</dict>
-        	</array>
-        <key>UIBackgroundModes</key>
-        	<array>
-        		<string>location</string>
-        	</array>
-        	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-        	<string>This app needs access to your location to record your hiking tracks even when the screen is locked.</string>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLName</key>
+				<string>shyn.app</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>shynapp</string>
+				</array>
+			</dict>
+		</array>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>location</string>
+		</array>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>This app needs access to your location to record your hiking tracks even when the screen is locked.</string>
 	</dict>
 </plist>

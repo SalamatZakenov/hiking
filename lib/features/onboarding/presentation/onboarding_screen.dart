@@ -1,7 +1,7 @@
 // lib/features/onboarding/presentation/onboarding_screen.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_theme.dart';
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
@@ -9,121 +9,88 @@ class OnboardingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgDark,
+      backgroundColor: Colors.black, // Основа под картинку
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          // 1. Плавный градиент на фоне (как на макете)
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFFDCE2E8), // Светло-серый/белый верх
-                    Color(0xFF8394A3), // Переходный стальной
-                    AppTheme.bgDark,   // Темный низ
-                    AppTheme.bgDark,
-                  ],
-                  stops: [0.0, 0.35, 0.6, 1.0],
-                ),
+          // 1. ФОНОВАЯ КАРТИНКА ГОР
+          Image.asset(
+            'assets/onboarding.png',
+            fit: BoxFit.cover,
+          ),
+
+          // Темный градиент поверх картинки, чтобы карточка читалась
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.1), // Сверху почти прозрачно, так как текста больше нет
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.6), // Снизу затемняем для карточки
+                  Colors.black.withOpacity(0.9), // Самый низ почти черный
+                ],
+                stops: const [0.0, 0.4, 0.7, 1.0],
               ),
             ),
           ),
 
-          // 2. Основной контент
+          // 2. ОСНОВНОЙ КОНТЕНТ (Только карточка и кнопка внизу)
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 children: [
-                  const SizedBox(height: 60), // Отступ сверху
+                  const Spacer(), // Сдвигает всё содержимое в самый низ экрана
 
-                  // Карточка с контентом и логотипом
-                  Expanded(
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      alignment: Alignment.topCenter,
-                      children: [
-                        // Сама стальная карточка
-                        Container(
-                          margin: const EdgeInsets.only(top: 50, bottom: 20),
-                          padding: const EdgeInsets.fromLTRB(24, 70, 24, 32),
-                          decoration: BoxDecoration(
-                            color: AppTheme.cardSlate,
-                            borderRadius: BorderRadius.circular(32),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Заголовок Track Every Step
-                              RichText(
-                                textAlign: TextAlign.center,
-                                text: const TextSpan(
-                                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'San Francisco'),
-                                  children: [
-                                    TextSpan(text: 'Track Every '),
-                                    TextSpan(
-                                      text: 'Step',
-                                      style: TextStyle(
-                                        decorationColor: AppTheme.iconDark,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-
-                              // Подзаголовок
-                              const Text(
-                                'Stay on course with real-time GPS\ntracking and offline maps.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: AppTheme.textLightGrey, fontSize: 15, height: 1.5),
-                              ),
-
-                              const SizedBox(height: 40),
-
-                              // Таймлайн (Темные иконки на светлом фоне)
-                              _buildTimelineItem(Icons.location_on_rounded, 'START POINT', 'Your Base Camp • 1,200m', isFirst: true),
-                              _buildTimelineItem(Icons.directions_walk_rounded, 'LIVE TRACKING', 'Current Pace • 3.2 km/h', isHighlight: true),
-                              _buildTimelineItem(Icons.flag_rounded, 'SUMMIT GOAL', "Eagle's Peak • 3,450m", isLast: true),
-
-                              const Spacer(),
-                            ],
-                          ),
+                  // --- СТЕКЛЯННАЯ КАРТОЧКА МАРШРУТА ---
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(32),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B).withOpacity(0.4), // Полупрозрачный темный фон
+                          borderRadius: BorderRadius.circular(32),
+                          border: Border.all(color: Colors.white.withOpacity(0.1)),
                         ),
-
-                        // Логотип (Круг поверх карточки)
-                        Positioned(
-                          top: 0,
-                          child: Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: AppTheme.iconDark, // Темный фон круга
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppTheme.cardSlate.withOpacity(0.5), width: 6), // Внешняя полупрозрачная рамка
-                            ),
-                            child: Container(
-                              margin: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: AppTheme.cardSlate, width: 2), // Внутренняя тонкая рамка
-                                shape: BoxShape.circle,
-                              ),
-                              // Если у тебя есть вырезанный логотип, используй Image.asset,
-                              // пока ставлю иконку гор для визуального соответствия
-                              child: const Icon(Icons.terrain_rounded, size: 40, color: Colors.white),
-                            ),
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min, // Занимает только нужное место
+                          children: [
+                            _buildTimelineItem(Icons.location_on_rounded, 'START POINT', 'Your Base Camp • 1,200m', isFirst: true),
+                            _buildTimelineItem(Icons.directions_walk_rounded, 'LIVE TRACKING', 'Current Pace • 3.2 km/h'),
+                            _buildTimelineItem(Icons.flag_rounded, 'SUMMIT GOAL', "Eagle's Peak • 3,450m", isLast: true),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
 
-                  // Нижняя кнопка (использует стиль из новой темы)
-                  FilledButton(
-                    onPressed: () => context.push('/auth-selection'),
-                    child: const Text('Lets Try and Get Started'),
+                  const SizedBox(height: 24),
+
+                  // --- НИЖНЯЯ КНОПКА ---
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: () => context.push('/auth-selection'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E293B).withOpacity(0.8), // Темная кнопка
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                          side: BorderSide(color: Colors.white.withOpacity(0.1)), // Тонкая рамка
+                        ),
+                      ),
+                      child: const Text(
+                        'Lets Try and Get Started',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
                 ],
@@ -135,43 +102,50 @@ class OnboardingScreen extends StatelessWidget {
     );
   }
 
-  // Обновленный таймлайн под новый дизайн
-  Widget _buildTimelineItem(IconData icon, String title, String subtitle, {bool isFirst = false, bool isLast = false, bool isHighlight = false}) {
+  // --- ЭЛЕМЕНТ ТАЙМЛАЙНА (Точки маршрута) ---
+  Widget _buildTimelineItem(IconData icon, String title, String subtitle, {bool isFirst = false, bool isLast = false}) {
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Левая часть: Темный кружок и тонкая линия
+          // Левая часть: Кружок и линия
           Column(
             children: [
               Container(
                 width: 40, height: 40,
-                decoration: const BoxDecoration(
-                  color: AppTheme.iconDark, // Темно-синий кружок
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A), // Очень темный фон иконки
                   shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withOpacity(0.05)),
                 ),
-                child: Icon(icon, size: 20, color: isHighlight ? Colors.white : AppTheme.cardSlate),
+                child: Icon(icon, size: 20, color: Colors.white),
               ),
               if (!isLast)
                 Expanded(
                   child: Container(
                     width: 1.5,
-                    color: AppTheme.iconDark.withOpacity(0.3), // Темная полупрозрачная линия
+                    color: Colors.white.withOpacity(0.15), // Тонкая светлая линия
                   ),
                 ),
             ],
           ),
           const SizedBox(width: 16),
-          // Правая часть: Текст
+          // Правая часть: Тексты
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 32.0, top: 4),
+              padding: const EdgeInsets.only(bottom: 24.0, top: 4), // Отступ снизу для линии
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                  Text(
+                      title,
+                      style: const TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.5)
+                  ),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: const TextStyle(color: AppTheme.textLightGrey, fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text(
+                      subtitle,
+                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13, fontWeight: FontWeight.w500)
+                  ),
                 ],
               ),
             ),

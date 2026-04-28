@@ -67,13 +67,11 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen> {
     }
   }
 
-
-  // Обновленный метод запуска
+  // Метод запуска OAuth
   Future<void> _launchOAuthUrl(String urlString) async {
     final Uri url = Uri.parse(urlString);
     if (!await launchUrl(
       url,
-      // ВЕРНУЛИ ВНЕШНИЙ БРАУЗЕР! Он работает на 100% безотказно.
       mode: LaunchMode.externalApplication,
     )) {
       debugPrint('Could not launch $url');
@@ -86,7 +84,6 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,60 +93,70 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             children: [
-              const SizedBox(height: 60),
+              const Spacer(flex: 2), // Отступ сверху до текста
 
-              Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(color: AppTheme.iconDark, shape: BoxShape.circle, border: Border.all(color: AppTheme.cardSlate.withOpacity(0.5), width: 4)),
-                child: Container(
-                  margin: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(border: Border.all(color: AppTheme.cardSlate, width: 2), shape: BoxShape.circle),
-                  child: const Icon(Icons.terrain_rounded, size: 36, color: Colors.white),
+              // --- ЗАГОЛОВОК ---
+              const Text(
+                'Sign up log in to\nstart exploring',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  height: 1.2,
+                  letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 32),
 
-              const Text('Sign up log in to start exploring', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5)),
-              const SizedBox(height: 48),
+              const Spacer(flex: 2), // Отступ от текста до кнопок
 
+              // --- КНОПКА FACEBOOK ---
               _buildSocialButton(
-                iconWidget: const Icon(Icons.apple, size: 28, color: Colors.white),
-                label: 'Continue with Apple',
-                onPressed: () {},
-              ),
-              const SizedBox(height: 16),
-
-              _buildSocialButton(
-                iconWidget: _buildGooglePlaceholder(),
-                label: 'Continue with Google',
-                onPressed: () => _launchOAuthUrl('https://shyn-api.site/oauth2/authorization/google'),
-              ),
-              const SizedBox(height: 16),
-
-              _buildSocialButton(
-                iconWidget: const Icon(Icons.facebook, size: 28, color: Color(0xFF1877F2)),
+                iconWidget: Image.asset('assets/facebook_logo.png', height: 26, width: 26),
                 label: 'Continue with Facebook',
                 onPressed: () => _launchOAuthUrl('https://shyn-api.site/oauth2/authorization/facebook'),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
 
+              // --- КНОПКА GOOGLE (Светло-серая как на референсе) ---
+              _buildSocialButton(
+                iconWidget: Image.asset('assets/google_logo.png', height: 26, width: 26),
+                label: 'Continue with Google',
+                backgroundColor: const Color(0xFF9CA3AF), // Светло-серый/стальной цвет
+                textColor: Colors.white,
+                onPressed: () => _launchOAuthUrl('https://shyn-api.site/oauth2/authorization/google'),
+              ),
+
+              const SizedBox(height: 40),
+
+              // --- РАЗДЕЛИТЕЛЬ "OR" ---
               Row(
                 children: [
-                  Expanded(child: Divider(color: AppTheme.cardSlate.withOpacity(0.5), thickness: 1)),
-                  const Padding(padding: EdgeInsets.symmetric(horizontal: 16.0), child: Text('OR', style: TextStyle(color: AppTheme.textLightGrey, fontWeight: FontWeight.bold, fontSize: 13))),
-                  Expanded(child: Divider(color: AppTheme.cardSlate.withOpacity(0.5), thickness: 1)),
+                  Expanded(child: Divider(color: Colors.white.withOpacity(0.2), thickness: 1)),
+                  const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text('OR', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold, fontSize: 13))
+                  ),
+                  Expanded(child: Divider(color: Colors.white.withOpacity(0.2), thickness: 1)),
                 ],
               ),
-              const SizedBox(height: 32),
 
+              const SizedBox(height: 40),
+
+              // --- КНОПКА EMAIL ---
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.cardSlate, foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), elevation: 0,
+                  backgroundColor: AppTheme.cardSlate,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 60),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  elevation: 0,
                 ),
                 onPressed: () => context.push('/login'),
                 child: const Text('Continue with email', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
+
+              const Spacer(flex: 3), // Отступ снизу
             ],
           ),
         ),
@@ -157,32 +164,46 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen> {
     );
   }
 
-  Widget _buildSocialButton({required Widget iconWidget, required String label, required VoidCallback onPressed}) {
+  // Обновленный метод создания кнопки: иконка строго слева, текст строго по центру
+  Widget _buildSocialButton({
+    required Widget iconWidget,
+    required String label,
+    required VoidCallback onPressed,
+    Color? backgroundColor,
+    Color? textColor,
+  }) {
     return SizedBox(
       height: 60,
+      width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.cardSlate, foregroundColor: Colors.white, elevation: 0,
+          backgroundColor: backgroundColor ?? AppTheme.cardSlate,
+          foregroundColor: textColor ?? Colors.white,
+          elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
           padding: const EdgeInsets.symmetric(horizontal: 24),
         ),
         onPressed: onPressed,
-        child: Row(
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            SizedBox(width: 30, child: iconWidget),
-            Expanded(child: Center(child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)))),
-            const SizedBox(width: 30),
+            // Иконка прижата к левому краю
+            Align(
+              alignment: Alignment.centerLeft,
+              child: iconWidget,
+            ),
+            // Текст ровно по центру кнопки
+            Text(
+                label,
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: textColor ?? Colors.white
+                )
+            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildGooglePlaceholder() {
-    return Container(
-      width: 24, height: 24,
-      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-      child: const Center(child: Text('G', style: TextStyle(color: Colors.redAccent, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'San Francisco'))),
     );
   }
 }
