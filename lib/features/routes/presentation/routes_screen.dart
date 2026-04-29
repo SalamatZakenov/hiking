@@ -9,6 +9,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../data/models/route_model.dart';
 import '../../../core/widgets/custom_header.dart';
+import '../../../core/theme/app_theme.dart';
 
 class RoutesScreen extends StatelessWidget {
   const RoutesScreen({super.key});
@@ -20,18 +21,18 @@ class RoutesScreen extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.bgDark,
         body: SafeArea(
           bottom: false,
           child: RefreshIndicator(
-            color: const Color(0xFF32D74B),
-            backgroundColor: Colors.black,
+            color: const Color(0xFFFFFFFF),
+            backgroundColor: AppTheme.bgDark,
             onRefresh: () => routeProvider.fetchRoutes(),
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverAppBar(
-                  backgroundColor: Colors.black,
+                  backgroundColor: AppTheme.bgDark,
                   floating: true,
                   snap: true,
                   elevation: 0,
@@ -95,7 +96,7 @@ class RoutesScreen extends StatelessWidget {
                   const SliverFillRemaining(child: Center(child: Text('No routes found.', style: TextStyle(color: Colors.white54))))
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.only(left: 24, right: 24, bottom: 120),
+                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 120),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                             (context, index) {
@@ -148,30 +149,30 @@ class RoutesScreen extends StatelessWidget {
             ),
 
             // 3. РЕЙТИНГ (СВЕРХУ СПРАВА)
-            Positioned(
-              top: 16, right: 16,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.15)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                        const SizedBox(width: 4),
-                        Text(route.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            // Positioned(
+            //   top: 16, right: 16,
+            //   child: ClipRRect(
+            //     borderRadius: BorderRadius.circular(20),
+            //     child: BackdropFilter(
+            //       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            //       child: Container(
+            //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            //         decoration: BoxDecoration(
+            //           color: Colors.black.withOpacity(0.4),
+            //           borderRadius: BorderRadius.circular(20),
+            //           border: Border.all(color: Colors.white.withOpacity(0.15)),
+            //         ),
+            //         child: Row(
+            //           children: [
+            //             const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+            //             const SizedBox(width: 4),
+            //             Text(route.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+            //           ],
+            //         ),
+            //       ),
+            //     ),
+            //   ),
+            // ),
 
             // 4. НИЖНЯЯ ПАНЕЛЬ: ULTRA-GLASS (КОМПАКТНАЯ)
             Positioned(
@@ -227,7 +228,7 @@ class RoutesScreen extends StatelessWidget {
                             Text(
                               distanceStr,
                               style: const TextStyle(
-                                color: Color(0xFF32D74B),
+                                color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -253,16 +254,16 @@ class RoutesScreen extends StatelessWidget {
 
     switch (difficulty.toUpperCase()) {
       case 'HARD':
-        bgColor = const Color(0xFFFFEBEB);
-        textColor = const Color(0xFFD32F2F);
+        bgColor = const Color(0xFFFFEDD6);
+        textColor = const Color(0xFF93000A);
         break;
       case 'EASY':
-        bgColor = const Color(0xFFE8F5E9);
-        textColor = const Color(0xFF2E7D32);
+        bgColor = const Color(0xFFD6FFD7);
+        textColor = const Color(0xFF00930A);
         break;
       case 'MEDIUM':
-        bgColor = const Color(0xFFFFF3E0);
-        textColor = const Color(0xFFE65100);
+        bgColor = const Color(0xFFF9FFD6);
+        textColor = const Color(0xFF937600);
         break;
       default:
         bgColor = Colors.white.withOpacity(0.1);

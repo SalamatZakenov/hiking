@@ -10,6 +10,8 @@ import '../../../core/widgets/feed_post_card.dart';
 import '../../tracking/providers/tracking_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../tracking/data/models/local_track.dart';
+import '../../../core/theme/app_theme.dart';
+
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -86,7 +88,7 @@ class ProfileScreen extends StatelessWidget {
     final String handle = '@${rawName.replaceAll(' ', '').toLowerCase()}';
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.bgDark,
       appBar: AppBar(
         toolbarHeight: 80,
         titleSpacing: 0,

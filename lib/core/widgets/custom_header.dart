@@ -18,7 +18,7 @@ class CustomHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.filter_hdr_rounded, color: Color(0xFF32D74B), size: 28),
+              const Icon(Icons.filter_hdr_rounded, color: Colors.white, size: 28),
               const SizedBox(width: 10),
               Text(
                 title.toUpperCase(),

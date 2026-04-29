@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../tracking/providers/tracking_provider.dart';
 import '../../../core/widgets/custom_header.dart';
+import '../../../core/theme/app_theme.dart';
+
 
 class LikedScreen extends StatefulWidget {
   const LikedScreen({super.key});
@@ -79,7 +81,7 @@ class _LikedScreenState extends State<LikedScreen> with SingleTickerProviderStat
     final activities = _generateActivities(tracker);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.bgDark,
       appBar: AppBar(
         toolbarHeight: 80, // ЕДИНАЯ ВЫСОТА
         titleSpacing: 0,
@@ -92,8 +94,8 @@ class _LikedScreenState extends State<LikedScreen> with SingleTickerProviderStat
         ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: const Color(0xFF32D74B),
-          labelColor: const Color(0xFF32D74B),
+          indicatorColor: const Color(0xFF00E5FF),
+          labelColor: const Color(0xFF00E5FF),
           unselectedLabelColor: Colors.white54,
           dividerColor: Colors.transparent,
           tabs: const [

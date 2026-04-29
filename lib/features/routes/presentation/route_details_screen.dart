@@ -1,3 +1,4 @@
+// lib/features/routes/presentation/route_details_screen.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/route_provider.dart';
 import '../data/models/route_model.dart';
 import '../../map/presentation/map_screen.dart';
+import '../../tracking/providers/tracking_provider.dart';
 
 class RouteDetailsScreen extends StatefulWidget {
   final String routeId;
@@ -64,24 +66,32 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
       final xmlString = response.data.toString();
 
       if (xmlString.isNotEmpty) {
-        final RegExp regExp = RegExp(r'<trkpt lat="([-+]?[\d.]+)" lon="([-+]?[\d.]+)"');
-        final matches = regExp.allMatches(xmlString);
-
-        List<LatLng> parsedPoints = [];
-        for (var m in matches) {
-          double lat = double.parse(m.group(1)!);
-          double lon = double.parse(m.group(2)!);
-
-          if (lat != 0 && lon != 0) {
-            parsedPoints.add(LatLng(lat, lon));
-          }
+        // 1. Ищем ТОЛЬКО точки трека (маршрута)
+        final RegExp trkRegExp = RegExp(r'<trkpt lat="([-+]?[\d.]+)" lon="([-+]?[\d.]+)"');
+        List<LatLng> trackPoints = [];
+        for (var m in trkRegExp.allMatches(xmlString)) {
+          trackPoints.add(LatLng(double.parse(m.group(1)!), double.parse(m.group(2)!)));
         }
 
-        if (parsedPoints.isEmpty) throw Exception("No points");
+        // 2. Ищем все метки (POI)
+        final RegExp wptRegExp = RegExp(r'<wpt lat="([-+]?[\d.]+)" lon="([-+]?[\d.]+)"');
+        List<LatLng> wayPoints = [];
+        for (var m in wptRegExp.allMatches(xmlString)) {
+          wayPoints.add(LatLng(double.parse(m.group(1)!), double.parse(m.group(2)!)));
+        }
+
+        // 3. Формируем ПРАВИЛЬНУЮ линию: От первой метки (Шлагбаум) -> затем весь путь наверх
+        List<LatLng> finalPath = [];
+        if (wayPoints.isNotEmpty) {
+          finalPath.add(wayPoints.first); // Добавляем самую первую метку как старт
+        }
+        finalPath.addAll(trackPoints); // Добавляем сам трек
+
+        if (finalPath.isEmpty) throw Exception("No points");
 
         if (mounted) {
           setState(() {
-            _points = parsedPoints;
+            _points = finalPath;
             _isLoadingMap = false;
           });
         }
@@ -157,14 +167,13 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                           ],
                         ),
 
-                        // --- ИНДИКАТОР ОФЛАЙН РЕЖИМА ---
                         if (routeProvider.isRegionDownloaded) ...[
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.offline_pin_rounded, color: Color(0xFF32D74B), size: 16),
+                              const Icon(Icons.offline_pin_rounded, color: Color(0xFF00E5FF), size: 16),
                               const SizedBox(width: 4),
-                              Text('Available Offline', style: TextStyle(color: const Color(0xFF32D74B).withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
+                              Text('Available Offline', style: TextStyle(color: const Color(0xFF00E5FF).withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w600)),
                             ],
                           ),
                         ],
@@ -229,7 +238,6 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
               ],
             ),
 
-            // --- КНОПКИ ВЕРХНЕЙ ПАНЕЛИ ---
             Positioned(
               top: MediaQuery.of(context).padding.top + 10,
               left: 16, right: 16,
@@ -252,7 +260,7 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                 ],
               ),
             ),
-            // Кнопка Старт
+
             Positioned(
               bottom: 0, left: 0, right: 0,
               child: Container(
@@ -264,10 +272,17 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                   height: 58,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF32D74B), foregroundColor: Colors.black,
+                      backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                     ),
-                    onPressed: () => context.go('/tracking'),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MapScreen(targetPeakName: route.name),
+                        ),
+                      );
+                    },
                     child: const Text('Start Hiking', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
                 ),
@@ -301,11 +316,12 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
             urlTemplate: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
             subdomains: const ['a', 'b', 'c'],
             userAgentPackageName: 'com.salamat.hiking_app',
-            tileProvider: CachedTileProvider(), // <--- ИСПОЛЬЗУЕМ ОФЛАЙН КЭШ НА МИНИ КАРТЕ
+            tileProvider: CachedTileProvider(),
           ),
           PolylineLayer(polylines: [Polyline(points: _points, color: const Color(0xFF007AFF), strokeWidth: 5.0, strokeCap: StrokeCap.round, strokeJoin: StrokeJoin.round)]),
           MarkerLayer(markers: [
-            Marker(point: _points.first, width: 30, height: 30, child: _buildMapMarker(const Color(0xFF32D74B), Icons.play_arrow_rounded)),
+            // Иконка СТАРТА теперь стоит ровно на первой метке
+            Marker(point: _points.first, width: 30, height: 30, child: _buildMapMarker(const Color(0xFF00E5FF), Icons.play_arrow_rounded)),
             Marker(point: _points.last, width: 30, height: 30, child: _buildMapMarker(Colors.redAccent, Icons.flag_rounded)),
           ]),
         ],
@@ -320,13 +336,14 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
         children: [
           PageView.builder(
             controller: _pageController,
+            physics: const BouncingScrollPhysics(), // Плавно отпружинивающая галерея
             onPageChanged: (index) => setState(() => _currentImageIndex = index),
             itemCount: images.length,
             itemBuilder: (context, index) {
               return CachedNetworkImage(
                 imageUrl: images[index],
                 fit: BoxFit.cover,
-                placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Color(0xFF32D74B))),
+                placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
                 errorWidget: (context, url, error) => const Center(child: Icon(Icons.image_not_supported, color: Colors.white24, size: 50)),
               );
             },
@@ -340,11 +357,11 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
                   duration: const Duration(milliseconds: 300),
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   width: _currentImageIndex == index ? 24 : 8, height: 8,
-                  decoration: BoxDecoration(color: _currentImageIndex == index ? const Color(0xFF32D74B) : Colors.white54, borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(color: _currentImageIndex == index ? const Color(0xFF00E5FF) : Colors.white54, borderRadius: BorderRadius.circular(4)),
                 )),
               ),
             ),
-          Positioned.fill(child: Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.center, colors: [Colors.black, Colors.transparent])))),
+          Positioned.fill(child: IgnorePointer(child: Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.center, colors: [Colors.black, Colors.transparent]))))),
         ],
       ),
     );
@@ -356,7 +373,7 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
       decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.05))),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF32D74B), size: 28),
+          Icon(icon, color: const Color(0xFF00E5FF), size: 28),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

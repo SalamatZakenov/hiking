@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../tracking/data/models/local_track.dart';
-import 'package:dio/dio.dart'; // <-- ОБЯЗАТЕЛЬНО ДОБАВЬ
+import 'package:dio/dio.dart';
+import '../../../core/theme/app_theme.dart';
 
 class TrackDetailScreen extends StatefulWidget {
   final LocalTrack track;
@@ -72,7 +73,7 @@ class _TrackDetailScreenState extends State<TrackDetailScreen> {
     final dateStr = "${widget.track.date.day.toString().padLeft(2, '0')}.${widget.track.date.month.toString().padLeft(2, '0')}.${widget.track.date.year}";
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.bgDark,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

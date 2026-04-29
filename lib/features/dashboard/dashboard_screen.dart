@@ -18,17 +18,14 @@ class DashboardScreen extends StatelessWidget {
     {'icon': Icons.person_rounded, 'label': 'Profile'},
   ];
 
-  // ИСПРАВЛЕНИЕ НАВИГАЦИИ: сопоставляем UI-индекс с реальной веткой
-  // Ветки: 0-Home, 1-Community, 2-Map (скрыта), 3-Stats, 4-Profile
   int _getRealIndex(int uiIndex) {
-    if (uiIndex >= 2) return uiIndex + 1; // Пропускаем индекс 2 (Карта)
+    if (uiIndex >= 2) return uiIndex + 1;
     return uiIndex;
   }
 
-  // Обратное сопоставление для индикатора
   int _getUiIndex(int realIndex) {
     if (realIndex >= 3) return realIndex - 1;
-    if (realIndex == 2) return 0; // Если вдруг попали на карту, подсветим Home
+    if (realIndex == 2) return 0;
     return realIndex;
   }
 
@@ -71,22 +68,21 @@ class DashboardScreen extends StatelessWidget {
   Widget _buildLiquidGlassBar(BuildContext context) {
     return SafeArea(
       child: Padding(
-        // ДЛЯ ШИРИНЫ: Уменьши 16 до 8, если хочешь еще шире
         padding: const EdgeInsets.only(left: 8, right: 8, top: 12, bottom: 4),
         child: Row(
           children: [
-            // Стеклянная панель занимает максимум места
+            // Стеклянная панель: стала прозрачнее и более размытой
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(40),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), // Усилили размытие
                   child: Container(
                     height: 74,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Color(0xFF00E6FF).withOpacity(0.05), // Сделали более прозрачным (стеклянным)
                       borderRadius: BorderRadius.circular(40),
-                      border: Border.all(color: Colors.white.withOpacity(0.15)),
+                      border: Border.all(color: Color(0xFF00E6FF).withOpacity(0.1)),
                     ),
                     child: Stack(
                       alignment: Alignment.center,
@@ -112,7 +108,6 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // Уменьшено расстояние между островами для визуальной ширины
             const SizedBox(width: 8),
             _buildMapActionButton(context),
           ],
@@ -134,10 +129,11 @@ class DashboardScreen extends StatelessWidget {
         widthFactor: 1.0 / count,
         child: Center(
           child: Container(
-            width: 77,  // Ширина овала
-            height: 64, // Высота овала
+            width: 77,
+            height: 64,
             decoration: BoxDecoration(
-              color: const Color(0xFF32D74B).withOpacity(0.2),
+              // Мутный бесцветный индикатор (полупрозрачный белый)
+              color: Colors.white.withOpacity(0.25),
               borderRadius: BorderRadius.circular(32),
             ),
           ),
@@ -147,7 +143,8 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildNavItem(BuildContext context, IconData icon, String label, int index, bool isSelected) {
-    final color = isSelected ? const Color(0xFF32D74B) : Colors.white;
+    // Тёмно-синий цвет для выбранного состояния
+    final color = Colors.white;
 
     return GestureDetector(
       onTap: () => _onTap(context, index),
@@ -187,10 +184,10 @@ class DashboardScreen extends StatelessWidget {
         height: 74,
         width: 74,
         decoration: BoxDecoration(
-          color: const Color(0xFF32D74B),
+          color: const Color(0xFF092547), // Кнопка карты осталась зеленой для акцента
           shape: BoxShape.circle,
           boxShadow: [
-            BoxShadow(color: const Color(0xFF32D74B).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))
+            BoxShadow(color: const Color(0xFF212C39).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))
           ],
         ),
         child: const Icon(Icons.near_me_outlined, color: Colors.white, size: 32),

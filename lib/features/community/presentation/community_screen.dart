@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../../tracking/providers/tracking_provider.dart';
 import '../../../core/widgets/custom_header.dart';
 import '../../../core/widgets/feed_post_card.dart';
+import '../../../core/theme/app_theme.dart';
+
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -23,20 +25,20 @@ class _CommunityScreenState extends State<CommunityScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.bgDark,
         body: SafeArea(
           bottom: false,
           // Оборачиваем CustomScrollView в RefreshIndicator для свайпа "обновить"
           child: RefreshIndicator(
             color: const Color(0xFF32D74B),
-            backgroundColor: Colors.black,
+            backgroundColor: AppTheme.bgDark,
             onRefresh: () => tracker.fetchCommunityPosts(),
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 // --- 1. ПЛАВАЮЩАЯ ШАПКА И ПОИСК ---
                 SliverAppBar(
-                  backgroundColor: Colors.black,
+                  backgroundColor: AppTheme.bgDark,
                   floating: true, // Появляется при скролле вверх
                   snap: true, // Плавное доведение анимации
                   elevation: 0,

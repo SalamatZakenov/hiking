@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // --- НОВЫЕ ЦВЕТА (Для Onboarding и нового стиля) ---
-  static const Color bgDark = Color(0xFF151921); // Глубокий темно-синий
+  static const Color bgDark = Color(0xFF0F1C29); // Глубокий темно-синий
   static const Color cardSlate = Color(0xFF8394A3); // Стальной сине-серый
   static const Color iconDark = Color(0xFF262D3A); // Темный кружок
   static const Color textLightGrey = Color(0xFFD4DBE1); // Светло-серый текст

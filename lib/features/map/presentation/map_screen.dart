@@ -30,7 +30,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final MapController _mapController = MapController();
   final Dio _dio = Dio();
 
-  final Color _routeGreen = const Color(0xFF32D74B);
+  final Color _routeGreen = const Color(0xFF00E5FF);
   final Color _userBlue = const Color(0xFF007AFF);
   final Color _glassColor = Colors.black.withOpacity(0.4);
   final Color _glassBorder = Colors.white.withOpacity(0.15);
@@ -181,13 +181,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     return Icons.cloud_rounded;
   }
 
+  // ОБНОВЛЕННЫЙ МЕТОД: Строит путь именно до ПЕРВОГО маркера (или старта трека)
   Future<void> _fetchPathToRoute(RouteModel route) async {
     final tracker = Provider.of<TrackingProvider>(context, listen: false);
     final startPoint = tracker.currentLocation ?? _currentLocation;
     if (startPoint == null) return;
 
     setState(() { _isLoadingPath = true; _pathToPeak.clear(); });
-    final destination = route.trailhead;
+
+    // Находим точную точку старта из файла
+    LatLng destination;
+    if (route.waypoints.isNotEmpty) {
+      destination = route.waypoints.first.location; // Самая первая метка (например, Шлагбаум)
+    } else if (route.trackPoints.isNotEmpty) {
+      destination = route.trackPoints.first; // Первая точка самого пути
+    } else {
+      destination = LatLng(route.latitude, route.longitude); // Резервный вариант
+    }
 
     try {
       final url = 'https://router.project-osrm.org/route/v1/driving/${startPoint.longitude},${startPoint.latitude};${destination.longitude},${destination.latitude}?geometries=geojson';
@@ -340,14 +350,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         body: Stack(
           children: [
             _buildMap(context, tracker, routeProvider),
-            if (_isInitializingTarget) Positioned.fill(child: Container(color: Colors.black.withOpacity(0.7), child: const Center(child: CircularProgressIndicator(color: Color(0xFF32D74B))))),
+            if (_isInitializingTarget) Positioned.fill(child: Container(color: Colors.black.withOpacity(0.7), child: const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))))),
             SafeArea(
               child: Align(
                 alignment: Alignment.topLeft,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: _buildGlassButton(
-                    icon: Icons.close_rounded, // Кнопка "крестик" для закрытия
+                    icon: Icons.close_rounded,
                     onTap: () => Navigator.of(context).pop(),
                   ),
                 ),
@@ -365,7 +375,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       const SizedBox(height: 16),
                       _buildGlassPanel(child: Column(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: const Icon(Icons.add, color: Colors.white), onPressed: _zoomIn), Container(height: 1, width: 24, color: Colors.white24), IconButton(icon: const Icon(Icons.remove, color: Colors.white), onPressed: _zoomOut)])),
                       const SizedBox(height: 16),
-                      _buildGlassButton(icon: Icons.my_location_rounded, onTap: _moveToCurrentLocation, iconColor: _autoFollow && tracker.isTracking ? const Color(0xFF32D74B) : Colors.white),
+                      _buildGlassButton(icon: Icons.my_location_rounded, onTap: _moveToCurrentLocation, iconColor: _autoFollow && tracker.isTracking ? const Color(0xFF00E5FF) : Colors.white),
                     ],
                   ),
                 ),
@@ -439,10 +449,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             tileProvider: CachedTileProvider(),
           ),
 
+          // ВЫДЕЛЕННЫЙ ПУТЬ ДО СТАРТА (Оранжево-желтый)
           if (_pathToPeak.isNotEmpty)
             PolylineLayer(
               polylines: [
-                Polyline(points: _pathToPeak, strokeWidth: 4.0, color: Colors.lightBlueAccent.withOpacity(0.9), borderStrokeWidth: 1.5, borderColor: Colors.blue[900]!)
+                Polyline(
+                    points: _pathToPeak,
+                    strokeWidth: 4.0,
+                    color: Colors.amber, // Выделяем путь до начала ярким цветом
+                    borderStrokeWidth: 1.5,
+                    borderColor: Colors.black87
+                )
               ],
             ),
 
@@ -490,7 +507,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 Marker(
                   point: _selectedRoute!.trackPoints.first,
                   width: 40, height: 40, alignment: Alignment.topCenter,
-                  child: Container(decoration: const BoxDecoration(color: Color(0xFF32D74B), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)]), padding: const EdgeInsets.all(4), child: const Icon(Icons.flag_circle_rounded, color: Colors.white, size: 24)),
+                  child: Container(decoration: const BoxDecoration(color: Color(0xFF00E5FF), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 4)]), padding: const EdgeInsets.all(4), child: const Icon(Icons.flag_circle_rounded, color: Colors.white, size: 24)),
                 ),
                 ..._selectedRoute!.waypoints.map((wp) {
                   bool isSelected = _selectedWaypoint == wp;
@@ -546,7 +563,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
                       child: Row(
                           children: const [
-                            Icon(Icons.directions_walk_rounded, color: Color(0xFF32D74B), size: 18),
+                            Icon(Icons.directions_walk_rounded, color: Color(0xFF00E5FF), size: 18),
                             SizedBox(width: 6),
                             Text('Hiking', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           ]
@@ -558,7 +575,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF32D74B), foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
                   icon: const Icon(Icons.play_arrow_rounded, size: 28),
                   label: const Text('Start Recording', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
                   onPressed: () {
@@ -575,7 +592,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMiniRouteInfo(TrackingProvider tracker, {Key? key}) {
-    Color difficultyColor = _selectedRoute!.difficulty.toUpperCase() == 'HARD' ? const Color(0xFFFF453A) : _selectedRoute!.difficulty.toUpperCase() == 'EASY' ? const Color(0xFF32D74B) : const Color(0xFFFF9F0A);
+    Color difficultyColor = _selectedRoute!.difficulty.toUpperCase() == 'HARD' ? const Color(0xFFFF453A) : _selectedRoute!.difficulty.toUpperCase() == 'EASY' ? const Color(0xFF00E5FF) : const Color(0xFFFF9F0A);
 
     return ClipRRect(
       key: key,
@@ -617,36 +634,40 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               else
                 Row(
                   children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.15), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
-                        icon: const Icon(Icons.info_outline_rounded),
-                        label: const Text('Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    SizedBox(
+                      width: 60, height: 58,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.15), foregroundColor: Colors.white, padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                        child: const Icon(Icons.info_outline_rounded),
                         onPressed: () => context.push('/routes/${_selectedRoute!.id}'),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    if (_pathToPeak.isNotEmpty)
-                      Expanded(
+                    if (_pathToPeak.isEmpty) ...[
+                      SizedBox(
+                        width: 60, height: 58,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.15), foregroundColor: Colors.white, padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                          child: const Icon(Icons.directions_car_rounded),
+                          onPressed: () => _fetchPathToRoute(_selectedRoute!),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: SizedBox(
+                        height: 58,
                         child: FilledButton.icon(
-                          style: FilledButton.styleFrom(backgroundColor: _routeGreen, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
-                          icon: const Icon(Icons.navigation_rounded),
+                          style: FilledButton.styleFrom(backgroundColor: _routeGreen, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                          icon: const Icon(Icons.play_arrow_rounded),
                           label: const Text('Start Trek', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                           onPressed: () {
                             setState(() => _autoFollow = true);
                             tracker.startTracking();
                           },
                         ),
-                      )
-                    else
-                      Expanded(
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
-                          icon: const Icon(Icons.directions_car_rounded),
-                          label: const Text('Draw Path', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                          onPressed: () => _fetchPathToRoute(_selectedRoute!),
-                        ),
                       ),
+                    ),
                   ],
                 ),
             ],

@@ -25,10 +25,21 @@ class FeedPostCard extends StatelessWidget {
     final String realUserName = track.username.isNotEmpty ? track.username : 'Explorer';
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 10),
+      // Отступы по краям для эффекта плавающей карточки
+      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E), // Темно-серый фон карточки
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white.withOpacity(0.05), // Возвращаем плотный темный цвет
+        borderRadius: BorderRadius.circular(24), // Чуть сильнее скругляем
+        // Добавляем тонкую границу, чтобы края были четко видны
+        // border: Border.all(color: Colors.white.withOpacity(0.08)),
+        // Добавляем тень для эффекта парения (Floating)
+        // boxShadow: [
+        //   BoxShadow(
+        //     color: Colors.black.withOpacity(0.6),
+        //     blurRadius: 15,
+        //     offset: const Offset(0, 8),
+        //   ),
+        // ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,7 +140,7 @@ class FeedPostCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Row(
               children: [
-                // Комментарий (Теперь первый, как на скрине)
+                // Комментарий
                 GestureDetector(
                   onTap: () {
                     showModalBottomSheet(
@@ -142,8 +153,8 @@ class FeedPostCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08), // Полупрозрачный фон
-                      borderRadius: BorderRadius.circular(20), // Сильное скругление
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
                       children: [
@@ -156,7 +167,7 @@ class FeedPostCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
 
-                // Лайк (Теперь второй)
+                // Лайк
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
@@ -165,8 +176,8 @@ class FeedPostCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08), // Полупрозрачный фон
-                      borderRadius: BorderRadius.circular(20), // Сильное скругление
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
                       children: [
