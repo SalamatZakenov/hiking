@@ -5,14 +5,53 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:geolocator/geolocator.dart'; // Для получения локации
+import 'package:latlong2/latlong.dart';      // Для работы с координатами
+
 import '../../auth/providers/auth_provider.dart';
 import '../providers/route_provider.dart';
 import '../data/models/route_model.dart';
 import '../../../core/widgets/custom_header.dart';
 import '../../../core/theme/app_theme.dart';
 
-class RoutesScreen extends StatelessWidget {
+class RoutesScreen extends StatefulWidget {
   const RoutesScreen({super.key});
+
+  @override
+  State<RoutesScreen> createState() => _RoutesScreenState();
+}
+
+class _RoutesScreenState extends State<RoutesScreen> {
+  LatLng? _userLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initLocation();
+  }
+
+  // Метод для получения локации пользователя при открытии экрана
+  Future<void> _initLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      if (mounted) {
+        setState(() {
+          _userLocation = LatLng(position.latitude, position.longitude);
+        });
+      }
+    } catch (e) {
+      debugPrint("Не удалось получить локацию: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,16 +154,38 @@ class RoutesScreen extends StatelessWidget {
     );
   }
 
-  // --- ОБНОВЛЕННАЯ КАРТОЧКА: GLASS МОЛОЧНЫЙ СТИЛЬ ---
+  // --- ОБНОВЛЕННАЯ КАРТОЧКА С ДИНАМИЧЕСКОЙ ДИСТАНЦИЕЙ ---
   Widget _buildPremiumRouteCard(BuildContext context, RouteModel route) {
-    final String distanceStr = route.calculatedDistance != null
-        ? '${route.calculatedDistance!.toStringAsFixed(1)} KM'
-        : '-- KM';
+    String distanceStr = '-- KM';
+
+    // РАСЧЕТ ДИСТАНЦИИ ДО ПИКА
+    if (_userLocation != null) {
+      // Пытаемся взять самую последнюю точку трека (Пик), если она уже загружена.
+      // Если нет - берем базовые координаты маршрута (они тоже обычно указывают на пик)
+      double targetLat = route.trackPoints.isNotEmpty ? route.trackPoints.last.latitude : route.latitude;
+      double targetLon = route.trackPoints.isNotEmpty ? route.trackPoints.last.longitude : route.longitude;
+
+      if (targetLat != 0.0 && targetLon != 0.0) {
+        double distanceInMeters = Geolocator.distanceBetween(
+          _userLocation!.latitude,
+          _userLocation!.longitude,
+          targetLat,
+          targetLon,
+        );
+        distanceStr = '${(distanceInMeters / 1000).toStringAsFixed(1)} KM';
+      } else if (route.calculatedDistance != null) {
+        // Резервный вариант, если пик почему-то 0.0
+        distanceStr = '${route.calculatedDistance!.toStringAsFixed(1)} KM';
+      }
+    } else if (route.calculatedDistance != null) {
+      // Резервный вариант, пока локация пользователя загружается
+      distanceStr = '${route.calculatedDistance!.toStringAsFixed(1)} KM';
+    }
 
     return GestureDetector(
       onTap: () => context.push('/routes/${route.id}'),
       child: Container(
-        height: 280, // Вернули стандартную высоту, так как панель стала меньше
+        height: 280,
         margin: const EdgeInsets.only(bottom: 24),
         child: Stack(
           fit: StackFit.expand,
@@ -148,33 +209,7 @@ class RoutesScreen extends StatelessWidget {
               child: _buildDifficultyBadge(route.difficulty),
             ),
 
-            // 3. РЕЙТИНГ (СВЕРХУ СПРАВА)
-            // Positioned(
-            //   top: 16, right: 16,
-            //   child: ClipRRect(
-            //     borderRadius: BorderRadius.circular(20),
-            //     child: BackdropFilter(
-            //       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            //       child: Container(
-            //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            //         decoration: BoxDecoration(
-            //           color: Colors.black.withOpacity(0.4),
-            //           borderRadius: BorderRadius.circular(20),
-            //           border: Border.all(color: Colors.white.withOpacity(0.15)),
-            //         ),
-            //         child: Row(
-            //           children: [
-            //             const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-            //             const SizedBox(width: 4),
-            //             Text(route.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-            //           ],
-            //         ),
-            //       ),
-            //     ),
-            //   ),
-            // ),
-
-            // 4. НИЖНЯЯ ПАНЕЛЬ: ULTRA-GLASS (КОМПАКТНАЯ)
+            // 3. НИЖНЯЯ ПАНЕЛЬ: ULTRA-GLASS (КОМПАКТНАЯ)
             Positioned(
               bottom: 12, left: 12, right: 12,
               child: ClipRRect(
@@ -205,7 +240,7 @@ class RoutesScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
 
-                        // НАЗВАНИЕ + ДИСТАНЦИЯ (В одну строку)
+                        // НАЗВАНИЕ + ДИНАМИЧЕСКАЯ ДИСТАНЦИЯ (В одну строку)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.center,
@@ -215,7 +250,7 @@ class RoutesScreen extends StatelessWidget {
                                 route.name,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 22, // Чуть уменьшили, чтобы всё влезло
+                                  fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: -0.5,
                                 ),
@@ -224,7 +259,7 @@ class RoutesScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            // ДИСТАНЦИЯ ТЕПЕРЬ СПРАВА
+                            // ДИСТАНЦИЯ ТЕПЕРЬ ПОКАЗЫВАЕТ КМ ОТ ТЕБЯ ДО ПИКА
                             Text(
                               distanceStr,
                               style: const TextStyle(
@@ -247,7 +282,7 @@ class RoutesScreen extends StatelessWidget {
     );
   }
 
-  // Стили бейджиков сложности как на скрине (светлый фон + яркий текст)
+  // Стили бейджиков сложности
   Widget _buildDifficultyBadge(String difficulty) {
     Color bgColor;
     Color textColor;
