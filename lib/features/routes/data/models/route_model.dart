@@ -15,6 +15,7 @@ class RouteModel {
   final double rating;
   final double? calculatedDistance;
   final List<LatLng>? cachedGpxPoints;
+  final bool isLocalGpx; // <-- ДОБАВЛЕНО ДЛЯ ЗАГЛУШКИ
 
   RouteModel({
     required this.id,
@@ -31,9 +32,9 @@ class RouteModel {
     this.rating = 5.0,
     this.calculatedDistance,
     this.cachedGpxPoints,
+    this.isLocalGpx = false, // <-- ДОБАВЛЕНО ДЛЯ ЗАГЛУШКИ
   });
 
-  // --- АДАПТЕРЫ ДЛЯ СТАРОГО КОДА КАРТЫ (map_screen.dart) ---
   LatLng get trailhead => LatLng(latitude, longitude);
   List<LatLng> get trackPoints => cachedGpxPoints ?? [];
   double get distanceKm => calculatedDistance ?? 0.0;
@@ -84,21 +85,21 @@ class RouteModel {
       rating: rating,
       calculatedDistance: calculatedDistance ?? this.calculatedDistance,
       cachedGpxPoints: cachedGpxPoints ?? this.cachedGpxPoints,
+      isLocalGpx: isLocalGpx,
     );
   }
 }
 
-// Обновленная заглушка: добавлено поле imageUrl
 class WaypointData {
   final LatLng location;
   final String name;
   final String description;
-  final String imageUrl; // Добавлено это поле
+  final String imageUrl;
 
   WaypointData({
     required this.location,
     required this.name,
     required this.description,
-    this.imageUrl = 'https://via.placeholder.com/300x180?text=No+Image', // Дефолтная картинка
+    this.imageUrl = 'https://via.placeholder.com/300x180?text=No+Image',
   });
 }

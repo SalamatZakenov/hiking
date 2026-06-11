@@ -43,11 +43,8 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Метод для вычисления недельного стрика (недель подряд)
   int _calculateWeeklyStreak(List<LocalTrack> tracks) {
     if (tracks.isEmpty) return 0;
-
-    // Преобразуем даты в номера недель (с поправкой на понедельник)
     Set<int> activeWeeks = tracks.map((t) {
       return (t.date.millisecondsSinceEpoch ~/ 86400000 + 3) ~/ 7;
     }).toSet();
@@ -55,8 +52,6 @@ class ProfileScreen extends StatelessWidget {
     int currentWeek = (DateTime.now().millisecondsSinceEpoch ~/ 86400000 + 3) ~/ 7;
     int streak = 0;
 
-    // Если на этой неделе была активность, считаем от нее.
-    // Если на этой еще не было, но была на прошлой, считаем от прошлой.
     if (activeWeeks.contains(currentWeek)) {
       int check = currentWeek;
       while (activeWeeks.contains(check)) {
@@ -81,9 +76,8 @@ class ProfileScreen extends StatelessWidget {
     final tracks = tracker.savedTracks;
     final int totalHikes = tracks.length;
     final double totalDistance = tracks.fold(0.0, (sum, track) => sum + track.distanceKm);
-    final int weeklyStreak = _calculateWeeklyStreak(tracks); // Вычисляем стрик
+    final int weeklyStreak = _calculateWeeklyStreak(tracks);
 
-    // Генерация никнейма из имени пользователя
     final String rawName = authProvider.user?.username ?? 'Salamat Zakenov';
     final String handle = '@${rawName.replaceAll(' ', '').toLowerCase()}';
 
@@ -100,7 +94,6 @@ class ProfileScreen extends StatelessWidget {
           child: CustomHeader(
             title: 'PROFILE',
             actions: [
-              // Убрали кнопку уведомлений, оставили только настройки (Logout)
               GlassButton(icon: Icons.settings_rounded, onTap: () => _showLogoutDialog(context, authProvider)),
             ],
           ),
@@ -110,8 +103,6 @@ class ProfileScreen extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 10),
-
-            // --- 1. НОВАЯ ШАПКА ПРОФИЛЯ КАК НА РЕФЕРЕНСЕ ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
@@ -119,17 +110,15 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      // Аватар слева
                       CircleAvatar(
                         radius: 40,
-                        backgroundColor: const Color(0xFF32D74B).withOpacity(0.2),
+                        backgroundColor: const Color(0xFF00E5FF).withOpacity(0.2), // Изменен цвет
                         child: Text(
                           rawName[0].toUpperCase(),
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF32D74B)),
+                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF)), // Изменен цвет
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // Имя и Никнейм справа от аватара
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,8 +140,6 @@ class ProfileScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // Статистика подписок (Followers / Following)
                   RichText(
                     text: const TextSpan(
                       style: TextStyle(fontSize: 16, color: Colors.white),
@@ -169,7 +156,6 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 32),
 
-            // --- 2. БЛОК СТАТИСТИКИ (ДОБАВЛЕН STREAK) ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: ClipRRect(
@@ -186,7 +172,7 @@ class ProfileScreen extends StatelessWidget {
                         Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
                         _buildStatItem('${totalDistance.toStringAsFixed(1)} km', 'Distance'),
                         Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
-                        _buildStatItem('$weeklyStreak wks', 'Streak'), // Новый элемент
+                        _buildStatItem('$weeklyStreak wks', 'Streak'),
                       ],
                     ),
                   ),
@@ -195,7 +181,6 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 40),
 
-            // --- 3. ЛЕНТА ПОСТОВ ПОЛЬЗОВАТЕЛЯ ---
             if (tracks.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(32.0),
@@ -217,7 +202,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Вспомогательный виджет для элементов статистики
   Widget _buildStatItem(String value, String label) {
     return Column(
       children: [

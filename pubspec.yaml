@@ -65,6 +65,7 @@ flutter:
     - assets/logo_v2.png
     - assets/splash_logo.png
     - assets/onboarding.png
+    - assets/gpx/
     - assets/google_logo.png
     - assets/facebook_logo.png
 

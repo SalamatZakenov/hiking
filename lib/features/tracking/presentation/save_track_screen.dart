@@ -16,7 +16,6 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
   String _selectedType = 'Hiking';
   final List<String> _activityTypes = ['Walking', 'Running', 'Hiking'];
 
-  // Список добавленных фото (пока храним ссылки для тестов)
   final List<String> _attachedPhotos = [];
 
   @override
@@ -41,7 +40,6 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
     final tracker = Provider.of<TrackingProvider>(context, listen: false);
     final points = tracker.routePoints;
 
-    // Вычисляем границы для идеального фокуса на маршруте
     LatLngBounds? bounds;
     if (points.length > 1) {
       bounds = LatLngBounds.fromPoints(points);
@@ -62,7 +60,6 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // --- КАРТА ---
             SizedBox(
               height: 250,
               width: double.infinity,
@@ -70,11 +67,10 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                 borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
                 child: FlutterMap(
                   options: MapOptions(
-                    // Идеальный зум (с отступами 20 и максимальным приближением 17.0)
                     initialCameraFit: bounds != null ? CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(20), maxZoom: 17.0) : null,
                     initialCenter: bounds == null && points.isNotEmpty ? points.first : const LatLng(43.2220, 76.8512),
                     initialZoom: 16.0,
-                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.none), // Тут карта статична
+                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
                   ),
                   children: [
                     TileLayer(
@@ -83,7 +79,6 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                       userAgentPackageName: 'com.salamat.hiking_app',
                     ),
 
-                    // --- ДОБАВЛЕНА ПРОВЕРКА ВОТ ТУТ ---
                     if (points.isNotEmpty)
                       PolylineLayer(
                         polylines: [
@@ -97,7 +92,7 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                     if (points.isNotEmpty)
                       MarkerLayer(
                         markers: [
-                          Marker(point: points.first, child: const Icon(Icons.location_on, color: Color(0xFF32D74B), size: 30)),
+                          Marker(point: points.first, child: const Icon(Icons.location_on, color: Color(0xFF00E5FF), size: 30)), // Изменен цвет
                           Marker(point: points.last, child: const Icon(Icons.flag_circle, color: Colors.red, size: 30)),
                         ],
                       ),
@@ -144,7 +139,7 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF32D74B) : Colors.white.withOpacity(0.1),
+                            color: isSelected ? const Color(0xFF00E5FF) : Colors.white.withOpacity(0.1), // Изменен цвет
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(type, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
@@ -154,7 +149,6 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                   ),
                   const SizedBox(height: 30),
 
-                  // --- ФОТОГРАФИИ ---
                   Row(
                     children: [
                       GestureDetector(
@@ -192,11 +186,10 @@ class _SaveTrackScreenState extends State<SaveTrackScreen> {
                   ),
                   const SizedBox(height: 40),
 
-                  // --- КНОПКИ ---
                   SizedBox(
                     width: double.infinity, height: 55,
                     child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF32D74B), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))), // Изменен цвет
                       onPressed: () async {
                         await tracker.saveCurrentTrack(name: _nameController.text.trim(), type: _selectedType, imageUrls: _attachedPhotos);
                         if (mounted) Navigator.pop(context);

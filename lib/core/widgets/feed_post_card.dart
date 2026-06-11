@@ -20,41 +20,28 @@ class FeedPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Подготовка реальных данных
     final dateStr = "${track.date.day.toString().padLeft(2, '0')}.${track.date.month.toString().padLeft(2, '0')}.${track.date.year}";
     final String realUserName = track.username.isNotEmpty ? track.username : 'Explorer';
 
     return Container(
-      // Отступы по краям для эффекта плавающей карточки
-      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      margin: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05), // Возвращаем плотный темный цвет
-        borderRadius: BorderRadius.circular(24), // Чуть сильнее скругляем
-        // Добавляем тонкую границу, чтобы края были четко видны
-        // border: Border.all(color: Colors.white.withOpacity(0.08)),
-        // Добавляем тень для эффекта парения (Floating)
-        // boxShadow: [
-        //   BoxShadow(
-        //     color: Colors.black.withOpacity(0.6),
-        //     blurRadius: 15,
-        //     offset: const Offset(0, 8),
-        //   ),
-        // ],
+        color: const Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 1. ЗАГОЛОВОК С ТРОЕТОЧИЕМ ---
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: const Color(0xFF32D74B).withOpacity(0.2),
+                  backgroundColor: const Color(0xFF00E5FF).withOpacity(0.2), // Изменен цвет
                   child: Text(
                     realUserName[0].toUpperCase(),
-                    style: const TextStyle(color: Color(0xFF32D74B), fontWeight: FontWeight.bold),
+                    style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold), // Изменен цвет
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -73,18 +60,12 @@ class FeedPostCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // ВЫПАДАЮЩЕЕ МЕНЮ
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_horiz, color: Colors.white54),
                   color: const Color(0xFF2C2C2E),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   onSelected: (value) {
                     HapticFeedback.lightImpact();
-                    if (value == 'share') {
-                      // Логика Поделиться
-                    } else if (value == 'save') {
-                      // Логика Сохранить
-                    }
                   },
                   itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
                     const PopupMenuItem<String>(
@@ -97,23 +78,12 @@ class FeedPostCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const PopupMenuItem<String>(
-                      value: 'save',
-                      child: Row(
-                        children: [
-                          Icon(Icons.bookmark_border_rounded, color: Colors.white, size: 20),
-                          SizedBox(width: 12),
-                          Text('Save', style: TextStyle(color: Colors.white, fontSize: 16)),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ],
             ),
           ),
 
-          // --- 2. НАЗВАНИЕ ПОСТА ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
@@ -129,18 +99,15 @@ class FeedPostCard extends StatelessWidget {
             ),
           ),
 
-          // --- 3. БЛОК КОНТЕНТА (СКРУГЛЕННЫЕ УГЛЫ) ---
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: _PostContentBlock(track: track),
           ),
 
-          // --- 4. КНОПКИ ДЕЙСТВИЙ (КАПСУЛЫ) ---
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Row(
               children: [
-                // Комментарий
                 GestureDetector(
                   onTap: () {
                     showModalBottomSheet(
@@ -167,7 +134,6 @@ class FeedPostCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
 
-                // Лайк
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
@@ -201,7 +167,6 @@ class FeedPostCard extends StatelessWidget {
   }
 }
 
-// --- БЛОК КОНТЕНТА ---
 class _PostContentBlock extends StatefulWidget {
   final LocalTrack track;
   const _PostContentBlock({required this.track});
@@ -216,7 +181,6 @@ class _PostContentBlockState extends State<_PostContentBlock> {
   Widget build(BuildContext context) {
     final imageUrls = widget.track.imageUrls;
 
-    // ЕСЛИ ФОТОГРАФИЙ НЕТ -> ПОКАЗЫВАЕМ ТОЛЬКО КАРТУ
     if (imageUrls.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -241,7 +205,6 @@ class _PostContentBlockState extends State<_PostContentBlock> {
       );
     }
 
-    // ЕСЛИ ФОТОГРАФИИ ЕСТЬ -> КАРУСЕЛЬ С ТОЧКАМИ И МИНИ-КАРТОЙ
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SizedBox(
@@ -252,7 +215,6 @@ class _PostContentBlockState extends State<_PostContentBlock> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Основные фото с прокруткой
               PageView.builder(
                 itemCount: imageUrls.length,
                 onPageChanged: (i) => setState(() => _currentIndex = i),
@@ -260,12 +222,11 @@ class _PostContentBlockState extends State<_PostContentBlock> {
                   return CachedNetworkImage(
                     imageUrl: imageUrls[index],
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05), child: const Center(child: CircularProgressIndicator(color: Color(0xFF32D74B)))),
+                    placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05), child: const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)))), // Изменен цвет
                   );
                 },
               ),
 
-              // МИНИ-КАРТА (Правый нижний угол)
               Positioned(
                 bottom: 12, right: 12,
                 child: GestureDetector(
@@ -286,7 +247,6 @@ class _PostContentBlockState extends State<_PostContentBlock> {
                 ),
               ),
 
-              // ТОЧКИ ИНДИКАЦИИ ПРОКРУТКИ (Белые)
               if (imageUrls.length > 1)
                 Positioned(
                   bottom: 16, left: 0, right: 0,
@@ -310,7 +270,6 @@ class _PostContentBlockState extends State<_PostContentBlock> {
   }
 }
 
-// --- ВИДЖЕТ МИНИ-КАРТЫ ---
 class _MiniMapWidget extends StatefulWidget {
   final LocalTrack track;
   const _MiniMapWidget({required this.track});
@@ -330,13 +289,18 @@ class _MiniMapWidgetState extends State<_MiniMapWidget> {
   Future<void> _load() async {
     try {
       String xmlString = "";
-      if (widget.track.gpxFilePath.startsWith('http')) {
+      // Понимаем локальные файлы assets/gpx/...
+      if (widget.track.gpxFilePath.startsWith('assets/')) {
+        xmlString = await rootBundle.loadString(widget.track.gpxFilePath);
+      }
+      else if (widget.track.gpxFilePath.startsWith('http')) {
         final response = await Dio().get(widget.track.gpxFilePath);
         xmlString = response.data.toString();
       } else {
         final file = File(widget.track.gpxFilePath);
         if (await file.exists()) xmlString = await file.readAsString();
       }
+
       if (xmlString.isNotEmpty) {
         final RegExp regExp = RegExp(r'<trkpt lat="([^"]+)" lon="([^"]+)".*?>');
         final matches = regExp.allMatches(xmlString);
@@ -353,7 +317,7 @@ class _MiniMapWidgetState extends State<_MiniMapWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (points.isEmpty) return Container(color: const Color(0xFFF0F0F0), child: const Center(child: CircularProgressIndicator(color: Color(0xFF32D74B), strokeWidth: 2)));
+    if (points.isEmpty) return Container(color: const Color(0xFFF0F0F0), child: const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF), strokeWidth: 2))); // Изменен цвет
     LatLngBounds? bounds;
     if (points.length > 1) bounds = LatLngBounds.fromPoints(points);
 
@@ -365,7 +329,7 @@ class _MiniMapWidgetState extends State<_MiniMapWidget> {
         ),
         children: [
           TileLayer(urlTemplate: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', subdomains: const ['a','b','c'], userAgentPackageName: 'com.salamat.hiking_app'),
-          if (points.isNotEmpty) PolylineLayer(polylines: [Polyline(points: points, color: const Color(0xFF32D74B), strokeWidth: 4, strokeCap: StrokeCap.round, strokeJoin: StrokeJoin.round)]),
+          if (points.isNotEmpty) PolylineLayer(polylines: [Polyline(points: points, color: const Color(0xFF00E5FF), strokeWidth: 4, strokeCap: StrokeCap.round, strokeJoin: StrokeJoin.round)]), // Изменен цвет
         ],
       ),
     );

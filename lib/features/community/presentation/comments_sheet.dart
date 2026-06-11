@@ -36,11 +36,11 @@ class _CommentsSheetState extends State<CommentsSheet> {
     if (_controller.text.trim().isEmpty) return;
     final text = _controller.text.trim();
     _controller.clear();
-    FocusScope.of(context).unfocus(); // Убираем клавиатуру
+    FocusScope.of(context).unfocus();
 
     final provider = Provider.of<TrackingProvider>(context, listen: false);
     await provider.addComment(widget.trackId, text);
-    _loadComments(); // Перезагружаем список
+    _loadComments();
   }
 
   @override
@@ -63,7 +63,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
 
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF32D74B)))
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))) // Изменен цвет
                 : _comments.isEmpty
                 ? const Center(child: Text('No comments yet. Be the first!', style: TextStyle(color: Colors.white54)))
                 : ListView.builder(
@@ -72,8 +72,8 @@ class _CommentsSheetState extends State<CommentsSheet> {
                 final comment = _comments[index];
                 return ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: const Color(0xFF32D74B).withOpacity(0.2),
-                    child: Text(comment['username'][0].toUpperCase(), style: const TextStyle(color: Color(0xFF32D74B), fontWeight: FontWeight.bold)),
+                    backgroundColor: const Color(0xFF00E5FF).withOpacity(0.2), // Изменен цвет
+                    child: Text(comment['username'][0].toUpperCase(), style: const TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)), // Изменен цвет
                   ),
                   title: Text(comment['username'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                   subtitle: Text(comment['text'], style: const TextStyle(color: Colors.white70)),
@@ -82,7 +82,6 @@ class _CommentsSheetState extends State<CommentsSheet> {
             ),
           ),
 
-          // Поле ввода
           Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 16, right: 16, top: 8),
             child: SafeArea(
@@ -105,7 +104,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                   const SizedBox(width: 8),
                   IconButton(
                     onPressed: _sendComment,
-                    icon: const Icon(Icons.send_rounded, color: Color(0xFF32D74B)),
+                    icon: const Icon(Icons.send_rounded, color: Color(0xFF00E5FF)), // Изменен цвет
                   )
                 ],
               ),
